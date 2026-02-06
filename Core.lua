@@ -163,6 +163,27 @@ function AQG:ShouldAllowContent(questID)
     return true -- no content tag = always allow
 end
 
+-- Check if a quest needs currency tokens
+function AQG:QuestItemIsCurrency()
+    local currenciesRequired = GetNumQuestCurrencies and GetNumQuestCurrencies() or 0
+    return currenciesRequired > 0
+end
+
+-- Check if a quest needs crafting reagents
+function AQG:QuestItemIsReagent()
+    local count = GetNumQuestItems and GetNumQuestItems() or 0
+    for i = 1, count do
+        local name, _, _, _, _, itemID = GetQuestItemInfo("required", i)
+        if name and itemID then
+            local isReagent = select(17, C_Item.GetItemInfo(itemID))
+            if isReagent then
+                return true, name
+            end
+        end
+    end
+    return false
+end
+
 function AQG:ShouldAutomate(questID, frequency, isTrivial, isMeta, isAccept)
     -- Content type filter (dungeon, raid, pvp, etc.)
     if not self:ShouldAllowContent(questID) then return false end

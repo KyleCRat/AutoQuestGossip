@@ -76,6 +76,30 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     end
 end)
 
+-- QUEST_ACCEPT_CONFIRM: auto-confirm escort/shared quests started by another player
+AQG:RegisterEvent("QUEST_ACCEPT_CONFIRM", function(playerName, questTitle)
+    local db = AutoQuestGossipDB
+    if not db.questEnabled or not db.questAcceptEnabled or not AQG:ShouldProceed() then return end
+
+    local label = (questTitle or "?") .. " (from " .. (playerName or "?") .. ")"
+
+    if db.debugEnabled then
+        AQG:DebugSeparator("QUEST_ACCEPT_CONFIRM")
+        AQG:Print("Escort/shared quest:", label)
+        if db.devMode then
+            AQG:Print("-> Dev mode. Would NOT auto-confirm.")
+        else
+            AQG:Print("-> Would auto-confirm.")
+        end
+    end
+
+    if db.devMode then return end
+
+    AQG:Verbose("Confirm:", label)
+    AQG:Debug("Auto-confirm escort/shared quest:", label)
+    ConfirmAcceptQuest()
+end)
+
 -- QUEST_DETAIL: auto-accept the offered quest
 AQG:RegisterEvent("QUEST_DETAIL", function()
     local db = AutoQuestGossipDB
@@ -129,6 +153,9 @@ AQG:RegisterEvent("QUEST_PROGRESS", function()
     local title = GetTitleText() or (questID and C_QuestLog.GetTitleForQuestID(questID)) or "?"
     local qType = questID and questID ~= 0 and QuestType(questID, nil, nil) or "?"
     local allowed = questID and questID ~= 0 and AQG:ShouldAutomate(questID, nil, nil, nil, false)
+    local goldCost = GetQuestMoneyToGet and GetQuestMoneyToGet() or 0
+    local requiresCurrency = AQG:QuestItemIsCurrency()
+    local requiresReagent, reagentName = AQG:QuestItemIsReagent()
 
     -- Debug: print detailed info to debug panel
     if db.debugEnabled then
@@ -137,6 +164,12 @@ AQG:RegisterEvent("QUEST_PROGRESS", function()
         AQG:DebugQuestAPIs(questID)
         if not completable then
             AQG:Print("-> Not completable yet. Would NOT advance.")
+        elseif goldCost > 0 then
+            AQG:Print("-> Requires gold (" .. GetCoinTextureString(goldCost) .. "). Would NOT advance.")
+        elseif requiresCurrency then
+            AQG:Print("-> Requires currency. Would NOT advance.")
+        elseif requiresReagent then
+            AQG:Print("-> Requires crafting reagent (" .. reagentName .. "). Would NOT advance.")
         elseif not allowed then
             AQG:Print("-> Filtered out by settings. Would NOT advance.")
         else
@@ -148,6 +181,9 @@ AQG:RegisterEvent("QUEST_PROGRESS", function()
     if db.devMode then return end
 
     if not completable then return end
+    if goldCost > 0 then return end
+    if requiresCurrency then return end
+    if requiresReagent then return end
     if questID and questID ~= 0 and not allowed then return end
 
     AQG:Verbose("Turn-in:", title, "(ID:", questID or "?", "| Type:", qType .. ")")
@@ -165,6 +201,7 @@ AQG:RegisterEvent("QUEST_COMPLETE", function()
     local qType = questID and questID ~= 0 and QuestType(questID, nil, nil) or "?"
     local numChoices = GetNumQuestChoices()
     local allowed = not questID or questID == 0 or AQG:ShouldAutomate(questID, nil, nil, nil, false)
+    local goldCost = GetQuestMoneyToGet and GetQuestMoneyToGet() or 0
 
     -- Debug: print detailed info to debug panel
     if db.debugEnabled then
@@ -174,6 +211,8 @@ AQG:RegisterEvent("QUEST_COMPLETE", function()
         AQG:Print("  Reward choices:", numChoices)
         if not allowed then
             AQG:Print("-> Filtered out by settings. Would NOT complete.")
+        elseif goldCost > 0 then
+            AQG:Print("-> Requires gold (" .. GetCoinTextureString(goldCost) .. "). Would NOT complete.")
         elseif numChoices > 1 then
             AQG:Print("-> Multiple rewards. Would NOT auto-complete (player must choose).")
         else
@@ -185,9 +224,43 @@ AQG:RegisterEvent("QUEST_COMPLETE", function()
     if db.devMode then return end
 
     if not allowed then return end
+    if goldCost > 0 then return end
     if numChoices <= 1 then
         AQG:Verbose("Complete:", title, "(ID:", questID or "?", "| Type:", qType .. ")")
         AQG:Debug("Auto turn-in (complete):", title, "(ID:", questID or "?", "| Type:", qType .. ")")
         GetQuestReward(numChoices)
     end
+end)
+
+-- QUEST_AUTOCOMPLETE: handle quests completed via the objective tracker
+AQG:RegisterEvent("QUEST_AUTOCOMPLETE", function(questID)
+    local db = AutoQuestGossipDB
+    if not db.questEnabled or not db.questTurnInEnabled or not AQG:ShouldProceed() then return end
+
+    local index = C_QuestLog.GetLogIndexForQuestID(questID)
+    if not index then return end
+    local info = C_QuestLog.GetInfo(index)
+    if not info or not info.isAutoComplete then return end
+
+    local title = info.title or C_QuestLog.GetTitleForQuestID(questID) or "?"
+    local qType = QuestType(questID, nil, nil)
+    local allowed = AQG:ShouldAutomate(questID, nil, nil, nil, false)
+
+    if db.debugEnabled then
+        AQG:DebugSeparator("QUEST_AUTOCOMPLETE")
+        AQG:Print(title, "(ID:", questID or "?", "| Type:", qType .. ")")
+        if not allowed then
+            AQG:Print("-> Filtered out by settings. Would NOT show completion.")
+        else
+            AQG:Print("-> Would show quest completion dialog.")
+        end
+    end
+
+    if db.devMode then return end
+    if not allowed then return end
+
+    AQG:Verbose("Auto-complete:", title, "(ID:", questID, "| Type:", qType .. ")")
+    AQG:Debug("Auto-complete (tracker):", title, "(ID:", questID, "| Type:", qType .. ")")
+    C_QuestLog.SetSelectedQuest(questID)
+    ShowQuestComplete(C_QuestLog.GetSelectedQuest())
 end)
