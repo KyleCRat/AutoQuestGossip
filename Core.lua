@@ -110,37 +110,36 @@ end
 
 function AQG:DebugQuestAPIs(questID)
     if not AutoQuestGossipDB.devMode then return end
-    local parts = {"  Raw APIs:"}
+    self:Print("  Raw APIs:")
     if QuestIsDaily then
-        table.insert(parts, "QuestIsDaily()=" .. tostring(QuestIsDaily()))
+        self:Print("    QuestIsDaily() = " .. tostring(QuestIsDaily()))
     end
     if QuestIsWeekly then
-        table.insert(parts, "QuestIsWeekly()=" .. tostring(QuestIsWeekly()))
+        self:Print("    QuestIsWeekly() = " .. tostring(QuestIsWeekly()))
     end
     if questID then
         if C_QuestLog.IsQuestTrivial then
-            table.insert(parts, "IsQuestTrivial=" .. tostring(C_QuestLog.IsQuestTrivial(questID)))
+            self:Print("    IsQuestTrivial = " .. tostring(C_QuestLog.IsQuestTrivial(questID)))
         end
         if C_QuestLog.IsQuestFlaggedCompletedOnAccount then
-            table.insert(parts, "WarboundCompleted=" .. tostring(C_QuestLog.IsQuestFlaggedCompletedOnAccount(questID)))
+            self:Print("    WarboundCompleted = " .. tostring(C_QuestLog.IsQuestFlaggedCompletedOnAccount(questID)))
         end
         if C_QuestLog.IsRepeatableQuest then
-            table.insert(parts, "IsRepeatable=" .. tostring(C_QuestLog.IsRepeatableQuest(questID)))
+            self:Print("    IsRepeatable = " .. tostring(C_QuestLog.IsRepeatableQuest(questID)))
         end
         local tagInfo = C_QuestLog.GetQuestTagInfo and C_QuestLog.GetQuestTagInfo(questID)
         if tagInfo then
-            table.insert(parts, "tagID=" .. tostring(tagInfo.tagID))
-            table.insert(parts, "tagName=" .. tostring(tagInfo.tagName))
-            table.insert(parts, "worldQuestType=" .. tostring(tagInfo.worldQuestType))
+            self:Print("    tagID = " .. tostring(tagInfo.tagID))
+            self:Print("    tagName = " .. tostring(tagInfo.tagName))
+            self:Print("    worldQuestType = " .. tostring(tagInfo.worldQuestType))
             local contentKey = CONTENT_TAG_MAP[tagInfo.tagID]
             if contentKey then
-                table.insert(parts, "contentFilter=" .. contentKey)
+                self:Print("    contentFilter = " .. contentKey)
             end
         else
-            table.insert(parts, "tagInfo=nil")
+            self:Print("    tagInfo = nil")
         end
     end
-    self:Debug(table.concat(parts, ", "))
 end
 
 function AQG:GetContentFilterKey(questID)
@@ -175,11 +174,31 @@ function AQG:ShouldAutomate(questID, frequency, isTrivial, isMeta, isAccept)
     return db[prefix .. "Regular"]
 end
 
+local function ArgsToString(...)
+    local parts = {}
+    for i = 1, select("#", ...) do
+        parts[i] = tostring(select(i, ...))
+    end
+    return table.concat(parts, " ")
+end
+
+local function PanelIsShown()
+    return AQGDebugPanel and AQGDebugPanel:IsShown()
+end
+
 function AQG:Print(...)
+    if AutoQuestGossipDB and AutoQuestGossipDB.devMode and self.PanelPrint then
+        self:PanelPrint(ArgsToString(...))
+        if PanelIsShown() then return end
+    end
     print(ADDON_COLOR .. "AQG:|r", ...)
 end
 
 function AQG:Warn(...)
+    if AutoQuestGossipDB and AutoQuestGossipDB.devMode and self.PanelPrint then
+        self:PanelPrint("|cffff4444[!] " .. ArgsToString(...) .. "|r")
+        if PanelIsShown() then return end
+    end
     print(ADDON_COLOR .. "AQG:|r |cffff4444\124TInterface\\DialogFrame\\UI-Dialog-Icon-AlertNew:0|t", ..., "|r")
 end
 
@@ -191,8 +210,20 @@ end
 
 function AQG:DevSeparator(event)
     if AutoQuestGossipDB.devMode then
-        print(SEPARATOR)
-        self:Print("[" .. event .. "]")
+        if self.PanelPrint then
+            self:PanelPrint("|cff00ccff--- " .. event .. " ---|r")
+            -- Ensure panel is visible (fallback if OnShow hook missed)
+            if self.ShowPanel then
+                local anchor = (DUIQuestFrame and DUIQuestFrame:IsShown() and DUIQuestFrame)
+                    or (GossipFrame and GossipFrame:IsShown() and GossipFrame)
+                    or (QuestFrame and QuestFrame:IsShown() and QuestFrame)
+                if anchor then self:ShowPanel(anchor) end
+            end
+        end
+        if not PanelIsShown() then
+            print(SEPARATOR)
+            print(ADDON_COLOR .. "AQG:|r", "[" .. event .. "]")
+        end
     end
 end
 
@@ -249,8 +280,15 @@ function AQG:OnInit(fn)
 end
 
 SLASH_AUTOQUESTGOSSIP1 = "/aqg"
-SlashCmdList["AUTOQUESTGOSSIP"] = function()
-    if AQG.settingsCategory then
-        Settings.OpenToCategory(AQG.settingsCategory:GetID())
+SlashCmdList["AUTOQUESTGOSSIP"] = function(msg)
+    local cmd = strtrim(msg):lower()
+    if cmd == "debug" then
+        if AQG.ToggleDetachedPanel then
+            AQG:ToggleDetachedPanel()
+        end
+    else
+        if AQG.settingsCategory then
+            Settings.OpenToCategory(AQG.settingsCategory:GetID())
+        end
     end
 end

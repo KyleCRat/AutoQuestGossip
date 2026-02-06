@@ -6,6 +6,7 @@
 ## SavedVariables: AutoQuestGossipDB
 
 Core.lua
+DebugPanel.lua
 Modules\Quest.lua
 Modules\Gossip.lua
 Settings.lua
