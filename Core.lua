@@ -74,7 +74,11 @@ local function IsModifierDown()
 end
 
 function AQG:ShouldProceed()
-    return not IsModifierDown()
+    if IsModifierDown() then
+        self:Debug("Modifier key held — automation paused.")
+        return false
+    end
+    return true
 end
 
 function AQG:ClassifyQuest(questID, frequency, isTrivial, isMeta)
