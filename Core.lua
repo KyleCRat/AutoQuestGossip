@@ -179,6 +179,10 @@ function AQG:Print(...)
     print(ADDON_COLOR .. "AQG:|r", ...)
 end
 
+function AQG:Warn(...)
+    print(ADDON_COLOR .. "AQG:|r |cffff4444\124TInterface\\DialogFrame\\UI-Dialog-Icon-AlertNew:0|t", ..., "|r")
+end
+
 function AQG:Debug(...)
     if AutoQuestGossipDB.debugEnabled then
         self:Print(...)
