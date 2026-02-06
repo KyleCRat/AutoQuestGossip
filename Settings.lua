@@ -22,6 +22,7 @@ AQG:OnInit(function()
     AddCheckbox("acceptWeekly", "Weekly Quests", "Auto-accept weekly quests")
     AddCheckbox("acceptTrivial", "Trivial (Low Level) Quests", "Auto-accept quests that are grey/trivial for your level")
     AddCheckbox("acceptWarboundCompleted", "Warbound Completed Quests", "Auto-accept quests already completed on another character")
+    AddCheckbox("acceptMeta", "Meta Quests", "Auto-accept meta/achievement quests")
     AddCheckbox("acceptRegular", "Regular Quests", "Auto-accept standard one-time quests")
 
     AddHeader("Auto Turn In")
@@ -30,7 +31,17 @@ AQG:OnInit(function()
     AddCheckbox("turnInWeekly", "Weekly Quests", "Auto turn-in weekly quests")
     AddCheckbox("turnInTrivial", "Trivial (Low Level) Quests", "Auto turn-in quests that are grey/trivial for your level")
     AddCheckbox("turnInWarboundCompleted", "Warbound Completed Quests", "Auto turn-in quests already completed on another character")
+    AddCheckbox("turnInMeta", "Meta Quests", "Auto turn-in meta/achievement quests")
     AddCheckbox("turnInRegular", "Regular Quests", "Auto turn-in standard one-time quests")
+
+    -- Content Type Filters
+    AddHeader("Content Type Filters")
+    AddCheckbox("contentDungeon", "Dungeon Quests", "Allow automation of quests tagged as dungeon content")
+    AddCheckbox("contentRaid", "Raid Quests", "Allow automation of quests tagged as raid content")
+    AddCheckbox("contentPvP", "PvP Quests", "Allow automation of quests tagged as PvP content")
+    AddCheckbox("contentGroup", "Group Quests", "Allow automation of quests tagged as requiring a group")
+    AddCheckbox("contentDelve", "Delve Quests", "Allow automation of quests tagged as delve content")
+    AddCheckbox("contentWorldBoss", "World Boss Quests", "Allow automation of quests tagged as world boss content")
 
     -- Modifier Key
     AddHeader("Modifier Key")
@@ -47,12 +58,8 @@ AQG:OnInit(function()
         local setting = Settings.RegisterAddOnSetting(
             category, "modifierKey", "modifierKey", AutoQuestGossipDB, "string", "Modifier Key", AutoQuestGossipDB.modifierKey
         )
-        Settings.CreateDropdown(category, setting, GetModifierOptions, "Hold this key to pause or activate automation")
+        Settings.CreateDropdown(category, setting, GetModifierOptions, "Hold this key to pause automation")
     end
-
-    AddCheckbox("invertModifier", "Hold Modifier to ACTIVATE (instead of pause)",
-        "When checked, automation only runs while the modifier key is held down. " ..
-        "When unchecked, automation runs by default and pauses while the modifier is held.")
 
     -- Gossip Automation
     AddHeader("Gossip Automation")
@@ -63,7 +70,8 @@ AQG:OnInit(function()
 
     -- Debug
     AddHeader("Debug")
-    AddCheckbox("debugEnabled", "Enable Debug Output", "Prints quest information to chat when a quest is automatically accepted")
+    AddCheckbox("debugEnabled", "Enable Debug Output", "Prints quest and gossip info to chat when automation acts (accept, turn-in, gossip select)")
+    AddCheckbox("devMode", "Enable Dev Mode", "Disables all automation and instead prints what would happen to chat. Shows quest types, raw API values, gossip options, and filtering decisions.")
 
     Settings.RegisterAddOnCategory(category)
     AQG.settingsCategory = category

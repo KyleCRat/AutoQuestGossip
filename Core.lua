@@ -1,5 +1,28 @@
 local addonName, AQG = ...
 
+-- Constants
+local ADDON_COLOR = "|cff00ccff"
+local SEPARATOR = ADDON_COLOR .. "--- AQG ----------------------------------------|r"
+
+local CONTENT_TAG_MAP = {
+    [1] = "contentGroup",
+    [41] = "contentPvP",
+    [62] = "contentRaid",
+    [81] = "contentDungeon",
+    [85] = "contentDungeon",       -- Heroic
+    [88] = "contentRaid",          -- Raid (10)
+    [89] = "contentRaid",          -- Raid (25)
+    [113] = "contentPvP",          -- PVP World Quest
+    [137] = "contentDungeon",      -- Dungeon World Quest
+    [141] = "contentRaid",         -- Raid World Quest
+    [145] = "contentDungeon",      -- Legionfall Dungeon World Quest
+    [255] = "contentPvP",          -- War Mode PvP
+    [256] = "contentPvP",          -- PvP Conquest
+    [278] = "contentPvP",          -- PVP Elite World Quest
+    [288] = "contentDelve",        -- Delve
+    [289] = "contentWorldBoss",    -- World Boss
+}
+
 -- Default settings
 local defaults = {
     -- Quest settings
@@ -10,21 +33,31 @@ local defaults = {
     acceptWeekly = true,
     acceptTrivial = false,
     acceptWarboundCompleted = false,
+    acceptMeta = false,
     acceptRegular = true,
     turnInDaily = true,
     turnInWeekly = true,
     turnInTrivial = false,
     turnInWarboundCompleted = false,
+    turnInMeta = false,
     turnInRegular = true,
     modifierKey = "SHIFT",
-    invertModifier = false,
+
+    -- Content type filters (all default enabled)
+    contentDungeon = true,
+    contentRaid = true,
+    contentPvP = true,
+    contentGroup = true,
+    contentDelve = true,
+    contentWorldBoss = true,
 
     -- Gossip settings
     gossipEnabled = true,
     gossipOnlySingle = true,
 
-    -- Debug
+    -- Debug / Dev
     debugEnabled = false,
+    devMode = false,
 }
 
 -- Shared addon table
@@ -40,28 +73,29 @@ local function IsModifierDown()
 end
 
 function AQG:ShouldProceed()
-    local mod = IsModifierDown()
-    local invert = AutoQuestGossipDB.invertModifier
-    if invert then return mod else return not mod end
+    return not IsModifierDown()
 end
 
-function AQG:ClassifyQuest(questID, frequency, isTrivial)
+function AQG:ClassifyQuest(questID, frequency, isTrivial, isMeta)
     -- Check daily: gossip frequency field, QuestIsDaily(), or tag info
     local isDaily = (frequency == 2) or (QuestIsDaily and QuestIsDaily())
     local isWeekly = (frequency == 3) or (QuestIsWeekly and QuestIsWeekly())
+    local isMetaQuest = isMeta or false
 
-    -- Also check C_QuestLog.GetQuestTagInfo for additional frequency data
-    if questID and (not isDaily and not isWeekly) then
-        local tagInfo = C_QuestLog.GetQuestTagInfo and C_QuestLog.GetQuestTagInfo(questID)
-        if tagInfo then
-            -- worldQuestType indicates world quests which are often dailies
-            if tagInfo.worldQuestType then
-                isDaily = true
-            end
+    -- Check C_QuestLog.GetQuestTagInfo for additional data
+    local tagInfo = questID and C_QuestLog.GetQuestTagInfo and C_QuestLog.GetQuestTagInfo(questID)
+    if tagInfo then
+        -- worldQuestType indicates world quests which are often dailies
+        if not isDaily and not isWeekly and tagInfo.worldQuestType then
+            isDaily = true
+        end
+        -- tagID 284 = Meta Quest
+        if tagInfo.tagID == 284 then
+            isMetaQuest = true
         end
     end
 
-    -- Check repeatable quests via QuestIsRepeatableQuest if available (often daily/weekly)
+    -- Check repeatable quests via IsRepeatableQuest if available (often daily/weekly)
     if questID and (not isDaily and not isWeekly) then
         if C_QuestLog.IsRepeatableQuest and C_QuestLog.IsRepeatableQuest(questID) then
             isDaily = true
@@ -71,11 +105,11 @@ function AQG:ClassifyQuest(questID, frequency, isTrivial)
     local isTrivialQuest = isTrivial or (C_QuestLog.IsQuestTrivial and C_QuestLog.IsQuestTrivial(questID))
     local isWarboundCompleted = C_QuestLog.IsQuestFlaggedCompletedOnAccount
         and C_QuestLog.IsQuestFlaggedCompletedOnAccount(questID)
-    return isDaily, isWeekly, isTrivialQuest, isWarboundCompleted
+    return isDaily, isWeekly, isTrivialQuest, isWarboundCompleted, isMetaQuest
 end
 
 function AQG:DebugQuestAPIs(questID)
-    if not AutoQuestGossipDB.debugEnabled then return end
+    if not AutoQuestGossipDB.devMode then return end
     local parts = {"  Raw APIs:"}
     if QuestIsDaily then
         table.insert(parts, "QuestIsDaily()=" .. tostring(QuestIsDaily()))
@@ -96,7 +130,12 @@ function AQG:DebugQuestAPIs(questID)
         local tagInfo = C_QuestLog.GetQuestTagInfo and C_QuestLog.GetQuestTagInfo(questID)
         if tagInfo then
             table.insert(parts, "tagID=" .. tostring(tagInfo.tagID))
+            table.insert(parts, "tagName=" .. tostring(tagInfo.tagName))
             table.insert(parts, "worldQuestType=" .. tostring(tagInfo.worldQuestType))
+            local contentKey = CONTENT_TAG_MAP[tagInfo.tagID]
+            if contentKey then
+                table.insert(parts, "contentFilter=" .. contentKey)
+            end
         else
             table.insert(parts, "tagInfo=nil")
         end
@@ -104,11 +143,31 @@ function AQG:DebugQuestAPIs(questID)
     self:Debug(table.concat(parts, ", "))
 end
 
-function AQG:ShouldAutomate(questID, frequency, isTrivial, isAccept)
+function AQG:GetContentFilterKey(questID)
+    local tagInfo = questID and C_QuestLog.GetQuestTagInfo and C_QuestLog.GetQuestTagInfo(questID)
+    if tagInfo and tagInfo.tagID then
+        return CONTENT_TAG_MAP[tagInfo.tagID]
+    end
+    return nil
+end
+
+function AQG:ShouldAllowContent(questID)
+    local key = self:GetContentFilterKey(questID)
+    if key then
+        return AutoQuestGossipDB[key]
+    end
+    return true -- no content tag = always allow
+end
+
+function AQG:ShouldAutomate(questID, frequency, isTrivial, isMeta, isAccept)
+    -- Content type filter (dungeon, raid, pvp, etc.)
+    if not self:ShouldAllowContent(questID) then return false end
+
     local db = AutoQuestGossipDB
-    local daily, weekly, trivial, warbound = self:ClassifyQuest(questID, frequency, isTrivial)
+    local daily, weekly, trivial, warbound, meta = self:ClassifyQuest(questID, frequency, isTrivial, isMeta)
     local prefix = isAccept and "accept" or "turnIn"
 
+    if meta then return db[prefix .. "Meta"] end
     if daily then return db[prefix .. "Daily"] end
     if weekly then return db[prefix .. "Weekly"] end
     if trivial then return db[prefix .. "Trivial"] end
@@ -116,19 +175,20 @@ function AQG:ShouldAutomate(questID, frequency, isTrivial, isAccept)
     return db[prefix .. "Regular"]
 end
 
-local ADDON_COLOR = "|cff00ccff"
-local SEPARATOR = ADDON_COLOR .. "--- AQG ----------------------------------------|r"
+function AQG:Print(...)
+    print(ADDON_COLOR .. "AQG:|r", ...)
+end
 
 function AQG:Debug(...)
     if AutoQuestGossipDB.debugEnabled then
-        print(ADDON_COLOR .. "AQG:|r", ...)
+        self:Print(...)
     end
 end
 
-function AQG:DebugSeparator(event)
-    if AutoQuestGossipDB.debugEnabled then
+function AQG:DevSeparator(event)
+    if AutoQuestGossipDB.devMode then
         print(SEPARATOR)
-        print(ADDON_COLOR .. "AQG:|r [" .. event .. "]")
+        self:Print("[" .. event .. "]")
     end
 end
 
