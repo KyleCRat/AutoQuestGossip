@@ -163,6 +163,29 @@ function AQG:ShouldAllowContent(questID)
     return true -- no content tag = always allow
 end
 
+-- Check if any gossip option has dangerous/important text that should pause all automation
+function AQG:GossipHasDangerousOption()
+    local options = C_GossipInfo.GetOptions()
+    if not options then return false, false end
+    local hasSkip, hasImportant = false, false
+
+    for _, option in ipairs(options) do
+        if option.name then
+            if not hasSkip and option.name:lower():find("skip") then
+                hasSkip = true
+            end
+
+            if not hasImportant and (option.name:find("<.+>") or option.name:find("|c")) then
+                hasImportant = true
+            end
+        end
+
+        if hasSkip and hasImportant then break end
+    end
+
+    return hasSkip, hasImportant
+end
+
 -- Check if a quest needs currency tokens
 function AQG:QuestItemIsCurrency()
     local currenciesRequired = GetNumQuestCurrencies and GetNumQuestCurrencies() or 0

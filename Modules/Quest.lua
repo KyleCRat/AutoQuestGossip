@@ -16,6 +16,15 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     local db = AutoQuestGossipDB
     if not db.questEnabled or not AQG:ShouldProceed() then return end
 
+    -- If any gossip option has skip/important text, pause ALL automation (quest + gossip)
+    local hasSkip, hasImportant = AQG:GossipHasDangerousOption()
+
+    if hasSkip or hasImportant then
+        if hasSkip then AQG:Warn("Skip option detected — automation paused.") end
+        if hasImportant and not hasSkip then AQG:Warn("Important selections detected — automation paused.") end
+        return
+    end
+
     local activeQuests = C_GossipInfo.GetActiveQuests()
     local availableQuests = C_GossipInfo.GetAvailableQuests()
 
@@ -33,6 +42,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
                 AQG:Print("  " .. QuestLabel(quest) .. " [" .. complete .. "]" .. action)
             end
         end
+
         if #availableQuests > 0 then
             AQG:Print("Available quests (accept):")
             for _, quest in ipairs(availableQuests) do
@@ -41,6 +51,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
                 AQG:Print("  " .. QuestLabel(quest) .. action)
             end
         end
+
         if #activeQuests == 0 and #availableQuests == 0 then
             AQG:Print("No quests at this NPC.")
         end

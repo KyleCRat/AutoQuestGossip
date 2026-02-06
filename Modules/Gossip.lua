@@ -53,25 +53,8 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     local availableQuests = C_GossipInfo.GetAvailableQuests()
     local hasQuests = (#activeQuests > 0) or (#availableQuests > 0)
 
-    -- Check if any option contains "Skip" — these are story/intro skip prompts that
-    -- should always pause automation so the player can choose intentionally.
-    local hasSkip = false
-    for _, option in ipairs(options) do
-        if option.name and option.name:lower():find("skip") then
-            hasSkip = true
-            break
-        end
-    end
-
-    -- Check if any option has <angle bracket> text or colored text (|c escape codes),
-    -- which indicates important choices the player should review.
-    local hasImportant = false
-    for _, option in ipairs(options) do
-        if option.name and (option.name:find("<.+>") or option.name:find("|c")) then
-            hasImportant = true
-            break
-        end
-    end
+    -- Check for skip/important text in gossip options
+    local hasSkip, hasImportant = AQG:GossipHasDangerousOption()
 
     -- Only skip selectOptionWhenOnlyOption when Blizzard is actually handling it (single option)
     local blizzardHandled = #options == 1
@@ -111,12 +94,13 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
         end
 
         local blocked = db.gossipOnlySingle and #options > 1
-        if hasQuests then
-            AQG:Print("-> NPC has quests. Would NOT auto-select gossip.")
-        elseif hasSkip then
+
+        if hasSkip then
             AQG:Print("-> Skip option detected. Would NOT auto-select.")
         elseif hasImportant then
             AQG:Print("-> Important selection detected. Would NOT auto-select.")
+        elseif hasQuests then
+            AQG:Print("-> NPC has quests. Would NOT auto-select gossip.")
         elseif hasUnknownIcon then
             AQG:Print("-> Unknown gossip icon type detected. Would NOT auto-select.")
         elseif blocked then
@@ -150,17 +134,8 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     -- If NPC has quests, don't auto-select gossip
     if hasQuests then return end
 
-    -- If any option contains "Skip", pause automation so the player can choose
-    if hasSkip then
-        AQG:Warn("Skip option detected — automation paused.")
-        return
-    end
-
-    -- If any option has important markers (brackets, colored text), pause automation
-    if hasImportant then
-        AQG:Warn("Important selections detected — automation paused.")
-        return
-    end
+    -- Skip/important already warned by Quest.lua — just block gossip too
+    if hasSkip or hasImportant then return end
 
     -- If any option has an unknown icon type, pause and let user handle manually
     if hasUnknownIcon then
