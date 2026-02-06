@@ -12,6 +12,12 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     local options = C_GossipInfo.GetOptions()
     if not options or #options == 0 then return end
 
+    -- Check if the NPC is offering any quests (active or available).
+    -- If so, don't auto-select gossip — the player should choose manually.
+    local activeQuests = C_GossipInfo.GetActiveQuests()
+    local availableQuests = C_GossipInfo.GetAvailableQuests()
+    local hasQuests = (#activeQuests > 0) or (#availableQuests > 0)
+
     -- Check if any option contains "Skip" — these are story/intro skip prompts that
     -- should always pause automation so the player can choose intentionally.
     local hasSkip = false
@@ -49,7 +55,9 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
                 wouldSelect = i
             end
         end
-        if hasSkip then
+        if hasQuests then
+            AQG:Print("-> NPC has quests. Would NOT auto-select gossip.")
+        elseif hasSkip then
             AQG:Print("-> Skip option detected. Would NOT auto-select.")
         elseif hasImportant then
             AQG:Print("-> Important selection detected. Would NOT auto-select.")
@@ -66,6 +74,9 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
 
     -- Dev mode: block automation after printing
     if db.devMode then return end
+
+    -- If NPC has quests, don't auto-select gossip
+    if hasQuests then return end
 
     -- If any option contains "Skip", pause automation so the player can choose
     if hasSkip then
