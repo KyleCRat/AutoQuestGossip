@@ -68,10 +68,41 @@ AQG:OnInit(function()
         "When enabled, gossip will only be auto-selected if there is exactly one option. " ..
         "If there are multiple options, you choose manually.")
 
-    -- Debug
-    AddHeader("Debug")
-    AddCheckbox("debugEnabled", "Enable Debug Output", "Prints quest and gossip info to chat when automation acts (accept, turn-in, gossip select)")
-    AddCheckbox("devMode", "Enable Dev Mode", "Disables all automation and instead prints what would happen to chat. Shows quest types, raw API values, gossip options, and filtering decisions.")
+    -- Output Modes
+    AddHeader("Output Modes")
+    AddCheckbox("verboseEnabled", "Verbose", "Print short messages to chat when the addon acts (e.g. 'Accept: Quest Name')")
+
+    do
+        local debugSetting = Settings.RegisterAddOnSetting(
+            category, "debugEnabled", "debugEnabled", AutoQuestGossipDB, "boolean", "Debug", AutoQuestGossipDB.debugEnabled
+        )
+        Settings.CreateCheckbox(category, debugSetting,
+            "Show the debug panel with full details on every quest and gossip interaction. " ..
+            "Automation continues to work normally. Use /aqg debug to open the panel standalone.")
+
+        local devSetting = Settings.RegisterAddOnSetting(
+            category, "devMode", "devMode", AutoQuestGossipDB, "boolean", "Dev Mode", AutoQuestGossipDB.devMode
+        )
+        Settings.CreateCheckbox(category, devSetting,
+            "Disables all automation so you can step through interactions manually. " ..
+            "Requires Debug mode (will be enabled automatically).")
+
+        -- Enabling Dev Mode -> also enable Debug
+        Settings.SetOnValueChangedCallback("devMode", function(_, _, newValue)
+            if newValue then
+                AutoQuestGossipDB.debugEnabled = true
+                debugSetting:SetValue(true)
+            end
+        end)
+
+        -- Disabling Debug -> also disable Dev Mode
+        Settings.SetOnValueChangedCallback("debugEnabled", function(_, _, newValue)
+            if not newValue then
+                AutoQuestGossipDB.devMode = false
+                devSetting:SetValue(false)
+            end
+        end)
+    end
 
     Settings.RegisterAddOnCategory(category)
     AQG.settingsCategory = category

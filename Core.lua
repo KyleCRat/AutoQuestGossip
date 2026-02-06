@@ -55,7 +55,8 @@ local defaults = {
     gossipEnabled = true,
     gossipOnlySingle = true,
 
-    -- Debug / Dev
+    -- Output modes
+    verboseEnabled = false,
     debugEnabled = false,
     devMode = false,
 }
@@ -109,7 +110,7 @@ function AQG:ClassifyQuest(questID, frequency, isTrivial, isMeta)
 end
 
 function AQG:DebugQuestAPIs(questID)
-    if not AutoQuestGossipDB.devMode then return end
+    if not AutoQuestGossipDB.debugEnabled then return end
     self:Print("  Raw APIs:")
     if QuestIsDaily then
         self:Print("    QuestIsDaily() = " .. tostring(QuestIsDaily()))
@@ -186,30 +187,40 @@ local function PanelIsShown()
     return AQGDebugPanel and AQGDebugPanel:IsShown()
 end
 
+-- Print: detailed debug output to panel (when debug/dev enabled), fallback to chat
 function AQG:Print(...)
-    if AutoQuestGossipDB and AutoQuestGossipDB.devMode and self.PanelPrint then
+    if AutoQuestGossipDB and AutoQuestGossipDB.debugEnabled and self.PanelPrint then
         self:PanelPrint(ArgsToString(...))
         if PanelIsShown() then return end
     end
     print(ADDON_COLOR .. "AQG:|r", ...)
 end
 
+-- Warn: always prints to chat, also to panel if debug enabled
 function AQG:Warn(...)
-    if AutoQuestGossipDB and AutoQuestGossipDB.devMode and self.PanelPrint then
+    if AutoQuestGossipDB and AutoQuestGossipDB.debugEnabled and self.PanelPrint then
         self:PanelPrint("|cffff4444[!] " .. ArgsToString(...) .. "|r")
-        if PanelIsShown() then return end
     end
     print(ADDON_COLOR .. "AQG:|r |cffff4444\124TInterface\\DialogFrame\\UI-Dialog-Icon-AlertNew:0|t", ..., "|r")
 end
 
+-- Verbose: short end-user messages to chat
+function AQG:Verbose(...)
+    if AutoQuestGossipDB.verboseEnabled then
+        print(ADDON_COLOR .. "AQG:|r", ...)
+    end
+end
+
+-- Debug: detailed output, only when debugEnabled
 function AQG:Debug(...)
     if AutoQuestGossipDB.debugEnabled then
         self:Print(...)
     end
 end
 
-function AQG:DevSeparator(event)
-    if AutoQuestGossipDB.devMode then
+-- DebugSeparator: section header in the debug panel
+function AQG:DebugSeparator(event)
+    if AutoQuestGossipDB.debugEnabled then
         if self.PanelPrint then
             self:PanelPrint("|cff00ccff--- " .. event .. " ---|r")
             -- Ensure panel is visible (fallback if OnShow hook missed)
@@ -283,6 +294,10 @@ SLASH_AUTOQUESTGOSSIP1 = "/aqg"
 SlashCmdList["AUTOQUESTGOSSIP"] = function(msg)
     local cmd = strtrim(msg):lower()
     if cmd == "debug" then
+        if not AutoQuestGossipDB.debugEnabled then
+            AutoQuestGossipDB.debugEnabled = true
+            AQG:Print("Debug mode enabled.")
+        end
         if AQG.ToggleDetachedPanel then
             AQG:ToggleDetachedPanel()
         end

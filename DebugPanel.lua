@@ -30,6 +30,17 @@ title:SetTextColor(0, 0.8, 1, 1)
 title:SetPoint("TOPLEFT", panel, "TOPLEFT", PADDING, -PADDING)
 title:SetText("AQG Debug")
 
+-- Close button
+local closeBtn = CreateFrame("Button", nil, panel, "UIPanelCloseButton")
+closeBtn:SetPoint("TOPRIGHT", panel, "TOPRIGHT", 2, 2)
+closeBtn:SetScript("OnClick", function()
+    if AQG.ToggleDetachedPanel then
+        AQG:ToggleDetachedPanel()
+    else
+        panel:Hide()
+    end
+end)
+
 -- Scroll frame
 local scrollFrame = CreateFrame("ScrollFrame", nil, panel)
 scrollFrame:SetPoint("TOPLEFT", panel, "TOPLEFT", PADDING, -(PADDING * 2 + FONT_SIZE + 2))
@@ -143,6 +154,7 @@ function AQG:ToggleDetachedPanel()
         panel:SetHeight(PANEL_HEIGHT_DETACHED)
         panel:SetFrameStrata("HIGH")
         panel:SetMovable(true)
+        panel:SetClampedToScreen(true)
         panel:EnableMouse(true)
         panel:RegisterForDrag("LeftButton")
         panel:Show()
@@ -164,7 +176,7 @@ local function HookFrame(frame)
     framesHooked[frame] = true
 
     frame:HookScript("OnShow", function(self)
-        if AutoQuestGossipDB and AutoQuestGossipDB.devMode then
+        if AutoQuestGossipDB and AutoQuestGossipDB.debugEnabled then
             AQG:ShowPanel(self)
         end
     end)

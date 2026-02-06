@@ -19,9 +19,9 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     local activeQuests = C_GossipInfo.GetActiveQuests()
     local availableQuests = C_GossipInfo.GetAvailableQuests()
 
-    -- Dev mode: print everything and what we would do, but don't act
-    if db.devMode then
-        AQG:DevSeparator("GOSSIP_SHOW")
+    -- Debug: print detailed info to debug panel
+    if db.debugEnabled then
+        AQG:DebugSeparator("GOSSIP_SHOW")
         if #activeQuests > 0 then
             AQG:Print("Active quests (turn-in):")
             for _, quest in ipairs(activeQuests) do
@@ -44,13 +44,16 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
         if #activeQuests == 0 and #availableQuests == 0 then
             AQG:Print("No quests at this NPC.")
         end
-        return
     end
+
+    -- Dev mode: block automation after printing
+    if db.devMode then return end
 
     -- Turn in completed quests
     if db.questTurnInEnabled then
         for _, quest in ipairs(activeQuests) do
             if quest.isComplete and AQG:ShouldAutomate(quest.questID, quest.frequency, quest.isTrivial, quest.isMeta, false) then
+                AQG:Verbose("Turn-in:", QuestLabel(quest))
                 AQG:Debug("Auto turn-in:", QuestLabel(quest))
                 C_GossipInfo.SelectActiveQuest(quest.questID)
                 AQG.questHandled = true
@@ -63,6 +66,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     if db.questAcceptEnabled then
         for _, quest in ipairs(availableQuests) do
             if AQG:ShouldAutomate(quest.questID, quest.frequency, quest.isTrivial, quest.isMeta, true) then
+                AQG:Verbose("Accept:", QuestLabel(quest))
                 AQG:Debug("Auto-accept:", QuestLabel(quest))
                 C_GossipInfo.SelectAvailableQuest(quest.questID)
                 AQG.questHandled = true
@@ -85,8 +89,9 @@ AQG:RegisterEvent("QUEST_DETAIL", function()
     local goldCost = GetQuestMoneyToGet and GetQuestMoneyToGet() or 0
     local allowed = AQG:ShouldAutomate(questID, nil, nil, nil, true)
 
-    if db.devMode then
-        AQG:DevSeparator("QUEST_DETAIL")
+    -- Debug: print detailed info to debug panel
+    if db.debugEnabled then
+        AQG:DebugSeparator("QUEST_DETAIL")
         AQG:Print(title, "(ID:", questID, "| Type:", qType .. ")")
         AQG:DebugQuestAPIs(questID)
         if goldCost > 0 then
@@ -96,12 +101,15 @@ AQG:RegisterEvent("QUEST_DETAIL", function()
         else
             AQG:Print("-> Would auto-accept.")
         end
-        return
     end
+
+    -- Dev mode: block automation after printing
+    if db.devMode then return end
 
     if goldCost > 0 then return end
     if not allowed then return end
 
+    AQG:Verbose("Accept:", title, "(ID:", questID, "| Type:", qType .. ")")
     AQG:Debug("Auto-accept:", title, "(ID:", questID, "| Type:", qType .. ")")
 
     if QuestGetAutoAccept and QuestGetAutoAccept() then
@@ -122,9 +130,10 @@ AQG:RegisterEvent("QUEST_PROGRESS", function()
     local qType = questID and questID ~= 0 and QuestType(questID, nil, nil) or "?"
     local allowed = questID and questID ~= 0 and AQG:ShouldAutomate(questID, nil, nil, nil, false)
 
-    if db.devMode then
-        AQG:DevSeparator("QUEST_PROGRESS")
-        AQG:Print(title, "(ID:", questID or 0, "| Type:", qType .. ")")
+    -- Debug: print detailed info to debug panel
+    if db.debugEnabled then
+        AQG:DebugSeparator("QUEST_PROGRESS")
+        AQG:Print(title, "(ID:", questID or "?", "| Type:", qType .. ")")
         AQG:DebugQuestAPIs(questID)
         if not completable then
             AQG:Print("-> Not completable yet. Would NOT advance.")
@@ -133,13 +142,16 @@ AQG:RegisterEvent("QUEST_PROGRESS", function()
         else
             AQG:Print("-> Would auto-advance to reward step.")
         end
-        return
     end
+
+    -- Dev mode: block automation after printing
+    if db.devMode then return end
 
     if not completable then return end
     if questID and questID ~= 0 and not allowed then return end
 
-    AQG:Debug("Auto turn-in (progress):", title, "(ID:", questID or 0, "| Type:", qType .. ")")
+    AQG:Verbose("Turn-in:", title, "(ID:", questID or "?", "| Type:", qType .. ")")
+    AQG:Debug("Auto turn-in (progress):", title, "(ID:", questID or "?", "| Type:", qType .. ")")
     CompleteQuest()
 end)
 
@@ -154,9 +166,10 @@ AQG:RegisterEvent("QUEST_COMPLETE", function()
     local numChoices = GetNumQuestChoices()
     local allowed = not questID or questID == 0 or AQG:ShouldAutomate(questID, nil, nil, nil, false)
 
-    if db.devMode then
-        AQG:DevSeparator("QUEST_COMPLETE")
-        AQG:Print(title, "(ID:", questID or 0, "| Type:", qType .. ")")
+    -- Debug: print detailed info to debug panel
+    if db.debugEnabled then
+        AQG:DebugSeparator("QUEST_COMPLETE")
+        AQG:Print(title, "(ID:", questID or "?", "| Type:", qType .. ")")
         AQG:DebugQuestAPIs(questID)
         AQG:Print("  Reward choices:", numChoices)
         if not allowed then
@@ -166,12 +179,15 @@ AQG:RegisterEvent("QUEST_COMPLETE", function()
         else
             AQG:Print("-> Would auto-complete.")
         end
-        return
     end
+
+    -- Dev mode: block automation after printing
+    if db.devMode then return end
 
     if not allowed then return end
     if numChoices <= 1 then
-        AQG:Debug("Auto turn-in (complete):", title, "(ID:", questID or 0, "| Type:", qType .. ")")
+        AQG:Verbose("Complete:", title, "(ID:", questID or "?", "| Type:", qType .. ")")
+        AQG:Debug("Auto turn-in (complete):", title, "(ID:", questID or "?", "| Type:", qType .. ")")
         GetQuestReward(numChoices)
     end
 end)

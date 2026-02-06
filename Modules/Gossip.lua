@@ -30,9 +30,9 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
         end
     end
 
-    -- Dev mode: print options and what we would select, but don't act
-    if db.devMode then
-        AQG:DevSeparator("GOSSIP_SHOW (Gossip)")
+    -- Debug: print detailed gossip info to debug panel
+    if db.debugEnabled then
+        AQG:DebugSeparator("GOSSIP_SHOW (Gossip)")
         AQG:Print("Gossip options (" .. #options .. "):")
         local wouldSelect = nil
         local blocked = db.gossipOnlySingle and #options > 1
@@ -58,8 +58,10 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
         else
             AQG:Print("-> No valid option to auto-select.")
         end
-        return
     end
+
+    -- Dev mode: block automation after printing
+    if db.devMode then return end
 
     -- If any option contains "Skip", pause automation so the player can choose
     if hasSkip then
@@ -82,6 +84,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
         if option.gossipOptionID then
             -- Skip if Blizzard already auto-selects this option
             if not option.selectOptionWhenOnlyOption then
+                AQG:Verbose("Gossip:", option.name or "?", "(ID:", option.gossipOptionID .. ")")
                 AQG:Debug("Auto-select gossip:", option.name or "?", "(ID:", option.gossipOptionID .. ")")
                 C_GossipInfo.SelectOption(option.gossipOptionID)
             end
