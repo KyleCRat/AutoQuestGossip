@@ -1,5 +1,7 @@
 local _, AQG = ...
 
+local selectedGossipIDs = {}
+
 AQG:RegisterEvent("GOSSIP_SHOW", function()
     -- Quest module runs first on the same event. If it selected a quest, skip gossip.
     if AQG.questHandled then return end
@@ -53,6 +55,8 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
             AQG:Print("-> Important selection detected. Would NOT auto-select.")
         elseif blocked then
             AQG:Print("-> Multiple options, single-only mode ON. Would NOT auto-select.")
+        elseif wouldSelect and selectedGossipIDs[options[wouldSelect].gossipOptionID] then
+            AQG:Print("-> Loop detected (option already selected this conversation). Would NOT auto-select.")
         elseif wouldSelect then
             AQG:Print("-> Would auto-select option " .. wouldSelect .. ": " .. (options[wouldSelect].name or "?"))
         else
@@ -84,6 +88,12 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
         if option.gossipOptionID then
             -- Skip if Blizzard already auto-selects this option
             if not option.selectOptionWhenOnlyOption then
+                -- Loop detection: if we've already selected this option this conversation, stop
+                if selectedGossipIDs[option.gossipOptionID] then
+                    AQG:Warn("Gossip loop detected — automation paused.")
+                    return
+                end
+                selectedGossipIDs[option.gossipOptionID] = true
                 AQG:Verbose("Gossip:", option.name or "?", "(ID:", option.gossipOptionID .. ")")
                 AQG:Debug("Auto-select gossip:", option.name or "?", "(ID:", option.gossipOptionID .. ")")
                 C_GossipInfo.SelectOption(option.gossipOptionID)
@@ -91,4 +101,9 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
             return
         end
     end
+end)
+
+-- Reset loop tracking when gossip window closes
+AQG:RegisterEvent("GOSSIP_CLOSED", function()
+    wipe(selectedGossipIDs)
 end)
