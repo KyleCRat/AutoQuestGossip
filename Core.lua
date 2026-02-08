@@ -183,6 +183,16 @@ function AQG:ShouldAllowContent(questID)
     return true -- no content tag = always allow
 end
 
+function AQG:GetNPCName()
+    return UnitName("npc") or "?"
+end
+
+function AQG:GetNPCID()
+    local guid = UnitGUID("npc")
+
+    return guid and select(6, strsplit("-", guid)) or "?"
+end
+
 function AQG:IsSkipOption(option)
     return option.name and option.name:lower():find("skip") ~= nil
 end
@@ -308,7 +318,13 @@ function AQG:DebugSeparator(event)
     if not AutoQuestGossipDB.debugEnabled or
        not self.PanelPrint then return end
 
-    self:PanelPrint("|cff00ccff--- " .. event .. " ---|r")
+    self:PanelPrint(
+        "|cff00ccff--- " .. event .. " ---|r"
+    )
+    self:PanelPrint(
+        "NPC: " .. self:GetNPCName()
+        .. " (ID: " .. self:GetNPCID() .. ")"
+    )
 
     -- Ensure panel is visible (fallback if OnShow hook missed)
     if self.ShowPanel then
