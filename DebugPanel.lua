@@ -9,6 +9,7 @@ local BG_COLOR = { 0, 0, 0, 0.85 }
 local BORDER_COLOR = { 0, 0.8, 1, 0.6 }
 
 local detached = false -- true when opened via /aqg debug
+local lines = {}
 
 -- Create the main panel frame
 local panel = CreateFrame("Frame", "AQGDebugPanel", UIParent, "BackdropTemplate")
@@ -53,22 +54,41 @@ scrollChild:SetWidth(PANEL_WIDTH - PADDING * 2)
 scrollChild:SetHeight(1) -- grows dynamically
 scrollFrame:SetScrollChild(scrollChild)
 
--- Content FontString
-local content = scrollChild:CreateFontString(nil, "OVERLAY")
+-- Hidden FontString for height measurement
+local measure = scrollChild:CreateFontString(nil, "OVERLAY")
+measure:SetFont(FONT_PATH, FONT_SIZE, "")
+measure:SetJustifyH("LEFT")
+measure:SetWordWrap(true)
+measure:SetWidth(PANEL_WIDTH - PADDING * 2)
+measure:SetAlpha(0)
+measure:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, 0)
+
+-- Content EditBox (selectable/copyable)
+local content = CreateFrame("EditBox", nil, scrollChild)
 content:SetFont(FONT_PATH, FONT_SIZE, "")
 content:SetTextColor(0.9, 0.9, 0.9, 1)
-content:SetJustifyH("LEFT")
-content:SetJustifyV("TOP")
-content:SetWordWrap(true)
+content:SetMultiLine(true)
+content:SetAutoFocus(false)
 content:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, 0)
 content:SetWidth(PANEL_WIDTH - PADDING * 2)
 content:SetText("")
+content:SetScript("OnEscapePressed", function(self)
+    self:ClearFocus()
+end)
+content:SetScript("OnEditFocusGained", function(self)
+    self:HighlightText()
+end)
+content:SetScript("OnTextChanged", function(self, userInput)
+    if userInput then
+        self:SetText(table.concat(lines, "\n"))
+    end
+end)
 
 -- Mouse wheel scrolling
 local scrollPos = 0
 
 local function UpdateScroll()
-    local contentHeight = content:GetStringHeight() or 0
+    local contentHeight = measure:GetStringHeight() or 0
     local viewHeight = scrollFrame:GetHeight() or 0
     local maxScroll = math.max(0, contentHeight - viewHeight)
     scrollPos = math.max(0, math.min(scrollPos, maxScroll))
@@ -81,25 +101,27 @@ scrollFrame:SetScript("OnMouseWheel", function(_, delta)
     UpdateScroll()
 end)
 
--- Internal line buffer
 local MAX_LINES = 2000
-local lines = {}
 
 function AQG:PanelPrint(text)
     table.insert(lines, text)
     if #lines > MAX_LINES then
         table.remove(lines, 1)
     end
-    content:SetText(table.concat(lines, "\n"))
+
+    local joined = table.concat(lines, "\n")
+    measure:SetText(joined)
+    content:SetText(joined)
 
     -- Resize scroll child to fit content
-    local contentHeight = content:GetStringHeight() or 0
+    local contentHeight = measure:GetStringHeight() or 0
     scrollChild:SetHeight(contentHeight)
+    content:SetHeight(contentHeight)
 
     -- Auto-scroll to bottom (deferred so layout is calculated)
     C_Timer.After(0, function()
         local viewHeight = scrollFrame:GetHeight() or 0
-        local totalHeight = content:GetStringHeight() or 0
+        local totalHeight = measure:GetStringHeight() or 0
         scrollPos = math.max(0, totalHeight - viewHeight)
         UpdateScroll()
     end)
@@ -107,8 +129,10 @@ end
 
 function AQG:PanelClear()
     lines = {}
+    measure:SetText("")
     content:SetText("")
     scrollChild:SetHeight(1)
+    content:SetHeight(1)
     scrollPos = 0
     scrollFrame:SetVerticalScroll(0)
 end
@@ -125,7 +149,8 @@ function AQG:ShowPanel(anchorFrame)
     panel:SetPoint("TOPRIGHT", anchorFrame, "TOPLEFT", -10, 0)
     panel:SetHeight(anchorFrame:GetHeight())
     panel:SetFrameStrata("HIGH")
-    -- Re-apply font on deeply nested content FontString (re-parenting invalidates it)
+    -- Re-apply font after re-parenting (invalidates nested font objects)
+    measure:SetFont(FONT_PATH, FONT_SIZE, "")
     content:SetFont(FONT_PATH, FONT_SIZE, "")
     panel:Show()
 end
