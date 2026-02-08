@@ -12,6 +12,8 @@ local SAFE_ICONS = {
     [ICON_GOSSIP] = true,
 }
 
+local MAX_GOSSIP_OPTIONS = 3
+
 local function IsVendorOption(option)
     return option.icon == ICON_VENDOR or (option.overrideIconID and
                                           option.overrideIconID == ICON_VENDOR)
@@ -126,19 +128,6 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
         return
     end
 
-    -- Guards and directory NPCs typically have 10+ options (directions to bank, AH, etc.)
-    -- Skip automation entirely for these NPCs.
-    local MAX_GOSSIP_OPTIONS = 8
-    if #options > MAX_GOSSIP_OPTIONS then
-        AQG:Debug("-> NPC has", #options,
-                  "gossip options (>" .. MAX_GOSSIP_OPTIONS .. ").",
-                  "Likely a guard — skipping.")
-
-        return
-    end
-
-    -- TODO: Figure outhow to handle dragonriding NPC's
-
     -- Check if the NPC is offering any quests (active or available).
     -- If so, don't auto-select gossip — the player should choose manually.
     local    activeQuests = C_GossipInfo.GetActiveQuests()
@@ -220,6 +209,15 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
                   IconTag(option) .. (option.name or "?"),
                   "(ID:", option.gossipOptionID .. ")")
         SelectGossip(options[vendorOption])
+
+        return
+    end
+
+    -- Skip NPCs with too many options (guards, dragonriding, etc.)
+    if #options > MAX_GOSSIP_OPTIONS then
+        AQG:Debug("-> NPC has", #options,
+                  "gossip options (>" .. MAX_GOSSIP_OPTIONS .. ").",
+                  "Skipping.")
 
         return
     end
