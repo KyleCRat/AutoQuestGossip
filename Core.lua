@@ -77,13 +77,13 @@ local function IsModifierDown()
     return false
 end
 
-function AQG:ShouldProceed()
+function AQG:PausedByModKey()
     if IsModifierDown() then
-        self:Debug("Modifier key held — automation paused.")
-        return false
+        self:Debug("-> Modifier key held — automation paused.")
+        return true
     end
 
-    return true
+    return false
 end
 
 function AQG:ClassifyQuest(questID, frequency, isTrivial, isMeta)
@@ -183,6 +183,14 @@ function AQG:ShouldAllowContent(questID)
     return true -- no content tag = always allow
 end
 
+function AQG:IsSkipOption(option)
+    return option.name and option.name:lower():find("skip") ~= nil
+end
+
+function AQG:IsImportantOption(option)
+    return option.name and (option.name:find("<.+>") or option.name:find("|c")) ~= nil
+end
+
 -- Check if any gossip option has dangerous/important text that should pause all automation
 function AQG:GossipHasDangerousOption()
     local options = C_GossipInfo.GetOptions()
@@ -190,14 +198,12 @@ function AQG:GossipHasDangerousOption()
     local hasSkip, hasImportant = false, false
 
     for _, option in ipairs(options) do
-        if option.name then
-            if not hasSkip and option.name:lower():find("skip") then
-                hasSkip = true
-            end
+        if not hasSkip and self:IsSkipOption(option) then
+            hasSkip = true
+        end
 
-            if not hasImportant and (option.name:find("<.+>") or option.name:find("|c")) then
-                hasImportant = true
-            end
+        if not hasImportant and self:IsImportantOption(option) then
+            hasImportant = true
         end
 
         if hasSkip and hasImportant then break end
@@ -340,8 +346,8 @@ frame:SetScript("OnEvent", function(self, event, ...)
 
             -- Fire module init callbacks
             if AQG.onInit then
-                for _, function in ipairs(AQG.onInit) do
-                    function()
+                for _, func in ipairs(AQG.onInit) do
+                    func()
                 end
             end
         end

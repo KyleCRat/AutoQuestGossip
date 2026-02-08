@@ -38,7 +38,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     local db = AutoQuestGossipDB
 
     if not db.questEnabled or
-       not AQG:ShouldProceed() then return end
+       AQG:PausedByModKey() then return end
 
     -- If any gossip option has skip/important text, pause ALL automation (quest + gossip)
     local hasSkip, hasImportant = AQG:GossipHasDangerousOption()
@@ -123,7 +123,7 @@ AQG:RegisterEvent("QUEST_ACCEPT_CONFIRM", function(playerName, questTitle)
     local db = AutoQuestGossipDB
     if not db.questEnabled or
        not db.questAcceptEnabled or
-       not AQG:ShouldProceed() then return end
+       AQG:PausedByModKey() then return end
 
     local label = (questTitle or "?") .. " (from " .. (playerName or "?") .. ")"
 
@@ -150,7 +150,7 @@ AQG:RegisterEvent("QUEST_DETAIL", function()
     local db = AutoQuestGossipDB
     if not db.questEnabled or
        not db.questAcceptEnabled or
-       not AQG:ShouldProceed() then return end
+       AQG:PausedByModKey() then return end
 
     local questID = GetQuestID()
     if not questID or questID == 0 then return end
@@ -197,7 +197,7 @@ AQG:RegisterEvent("QUEST_PROGRESS", function()
     local db = AutoQuestGossipDB
     if not db.questEnabled or
        not db.questTurnInEnabled or
-       not AQG:ShouldProceed() then return end
+       AQG:PausedByModKey() then return end
 
     local completable = IsQuestCompletable()
     local questID = GetQuestID()
@@ -249,7 +249,7 @@ AQG:RegisterEvent("QUEST_COMPLETE", function()
     local db = AutoQuestGossipDB
     if not db.questEnabled or
        not db.questTurnInEnabled or
-       not AQG:ShouldProceed() then return end
+       AQG:PausedByModKey() then return end
 
     local questID = GetQuestID()
     local title = QuestTitle(questID)
@@ -293,7 +293,7 @@ AQG:RegisterEvent("QUEST_AUTOCOMPLETE", function(questID)
     local db = AutoQuestGossipDB
     if not db.questEnabled or
        not db.questTurnInEnabled or
-       not AQG:ShouldProceed() then return end
+       AQG:PausedByModKey() then return end
 
     local index = C_QuestLog.GetLogIndexForQuestID(questID)
     if not index then return end
