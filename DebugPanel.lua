@@ -125,6 +125,8 @@ function AQG:ShowPanel(anchorFrame)
     panel:SetPoint("TOPRIGHT", anchorFrame, "TOPLEFT", -10, 0)
     panel:SetHeight(anchorFrame:GetHeight())
     panel:SetFrameStrata("HIGH")
+    -- Re-apply font on deeply nested content FontString (re-parenting invalidates it)
+    content:SetFont(FONT_PATH, FONT_SIZE, "")
     panel:Show()
 end
 

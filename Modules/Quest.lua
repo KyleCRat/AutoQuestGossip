@@ -1,20 +1,44 @@
 local _, AQG = ...
 
+local GetTitle = C_QuestLog.GetTitleForQuestID
+
 local function QuestType(questID, frequency, isTrivial, isMeta)
-    local daily, weekly, trivial, warbound, meta = AQG:ClassifyQuest(questID, frequency, isTrivial, isMeta)
-    return meta and "Meta" or daily and "Daily" or weekly and "Weekly" or trivial and "Trivial" or warbound and "Warbound" or "Regular"
+    local daily,
+          weekly,
+          trivial,
+          warbound,
+          meta = AQG:ClassifyQuest(questID, frequency, isTrivial, isMeta)
+
+    return meta and "Meta" or
+           daily and "Daily" or
+           weekly and "Weekly" or
+           trivial and "Trivial" or
+           warbound and "Warbound" or
+           "Regular"
 end
 
 local function QuestLabel(quest)
-    local title = quest.title or C_QuestLog.GetTitleForQuestID(quest.questID) or "?"
-    return title .. " (ID: " .. quest.questID .. " | Type: " .. QuestType(quest.questID, quest.frequency, quest.isTrivial, quest.isMeta) .. ")"
+    local title = quest.title or GetTitle(quest.questID) or "?"
+    local questType = QuestType(quest.questID,
+                                quest.frequency,
+                                quest.isTrivial,
+                                quest.isMeta)
+
+    return title .. " (ID: " .. quest.questID .. " | Type: " .. questType .. ")"
 end
 
--- GOSSIP_SHOW: auto-select available and completable quests from the gossip window
+local function QuestTitle(questID)
+    return GetTitleText() or (questID and GetTitle(questID)) or "?"
+end
+
+-- GOSSIP_SHOW:
+-- auto-select available and completable quests from the gossip window
 AQG:RegisterEvent("GOSSIP_SHOW", function()
     AQG.questHandled = false
     local db = AutoQuestGossipDB
-    if not db.questEnabled or not AQG:ShouldProceed() then return end
+
+    if not db.questEnabled or
+       not AQG:ShouldProceed() then return end
 
     -- If any gossip option has skip/important text, pause ALL automation (quest + gossip)
     local hasSkip, hasImportant = AQG:GossipHasDangerousOption()
@@ -22,6 +46,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     if hasSkip or hasImportant then
         if hasSkip then AQG:Warn("Skip option detected — automation paused.") end
         if hasImportant and not hasSkip then AQG:Warn("Important selections detected — automation paused.") end
+
         return
     end
 
@@ -31,8 +56,10 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     -- Debug: print detailed info to debug panel
     if db.debugEnabled then
         AQG:DebugSeparator("GOSSIP_SHOW")
+
         if #activeQuests > 0 then
             AQG:Print("Active quests (turn-in):")
+
             for _, quest in ipairs(activeQuests) do
                 local complete = quest.isComplete and "COMPLETE" or "incomplete"
                 local allowed = quest.isComplete and AQG:ShouldAutomate(quest.questID, quest.frequency, quest.isTrivial, quest.isMeta, false)
@@ -45,6 +72,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
 
         if #availableQuests > 0 then
             AQG:Print("Available quests (accept):")
+
             for _, quest in ipairs(availableQuests) do
                 local allowed = AQG:ShouldAutomate(quest.questID, quest.frequency, quest.isTrivial, quest.isMeta, true)
                 local action = allowed and " -> Would auto-accept" or " -> Filtered out by settings"
@@ -68,6 +96,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
                 AQG:Debug("Auto turn-in:", QuestLabel(quest))
                 C_GossipInfo.SelectActiveQuest(quest.questID)
                 AQG.questHandled = true
+
                 return
             end
         end
@@ -81,16 +110,20 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
                 AQG:Debug("Auto-accept:", QuestLabel(quest))
                 C_GossipInfo.SelectAvailableQuest(quest.questID)
                 AQG.questHandled = true
+
                 return
             end
         end
     end
 end)
 
--- QUEST_ACCEPT_CONFIRM: auto-confirm escort/shared quests started by another player
+-- QUEST_ACCEPT_CONFIRM:
+-- auto-confirm escort/shared quests started by another player
 AQG:RegisterEvent("QUEST_ACCEPT_CONFIRM", function(playerName, questTitle)
     local db = AutoQuestGossipDB
-    if not db.questEnabled or not db.questAcceptEnabled or not AQG:ShouldProceed() then return end
+    if not db.questEnabled or
+       not db.questAcceptEnabled or
+       not AQG:ShouldProceed() then return end
 
     local label = (questTitle or "?") .. " (from " .. (playerName or "?") .. ")"
 
@@ -111,15 +144,18 @@ AQG:RegisterEvent("QUEST_ACCEPT_CONFIRM", function(playerName, questTitle)
     ConfirmAcceptQuest()
 end)
 
--- QUEST_DETAIL: auto-accept the offered quest
+-- QUEST_DETAIL:
+-- auto-accept the offered quest
 AQG:RegisterEvent("QUEST_DETAIL", function()
     local db = AutoQuestGossipDB
-    if not db.questEnabled or not db.questAcceptEnabled or not AQG:ShouldProceed() then return end
+    if not db.questEnabled or
+       not db.questAcceptEnabled or
+       not AQG:ShouldProceed() then return end
 
     local questID = GetQuestID()
     if not questID or questID == 0 then return end
 
-    local title = GetTitleText() or C_QuestLog.GetTitleForQuestID(questID) or "?"
+    local title = QuestTitle(questID)
     local qType = QuestType(questID, nil, nil)
     local goldCost = GetQuestMoneyToGet and GetQuestMoneyToGet() or 0
     local allowed = AQG:ShouldAutomate(questID, nil, nil, nil, true)
@@ -129,6 +165,7 @@ AQG:RegisterEvent("QUEST_DETAIL", function()
         AQG:DebugSeparator("QUEST_DETAIL")
         AQG:Print(title, "(ID:", questID, "| Type:", qType .. ")")
         AQG:DebugQuestAPIs(questID)
+
         if goldCost > 0 then
             AQG:Print("-> Requires gold. Would NOT auto-accept.")
         elseif not allowed then
@@ -154,14 +191,17 @@ AQG:RegisterEvent("QUEST_DETAIL", function()
     end
 end)
 
--- QUEST_PROGRESS: advance to the completion/reward step
+-- QUEST_PROGRESS:
+-- advance to the completion/reward step
 AQG:RegisterEvent("QUEST_PROGRESS", function()
     local db = AutoQuestGossipDB
-    if not db.questEnabled or not db.questTurnInEnabled or not AQG:ShouldProceed() then return end
+    if not db.questEnabled or
+       not db.questTurnInEnabled or
+       not AQG:ShouldProceed() then return end
 
     local completable = IsQuestCompletable()
     local questID = GetQuestID()
-    local title = GetTitleText() or (questID and C_QuestLog.GetTitleForQuestID(questID)) or "?"
+    local title = QuestTitle()
     local qType = questID and questID ~= 0 and QuestType(questID, nil, nil) or "?"
     local allowed = questID and questID ~= 0 and AQG:ShouldAutomate(questID, nil, nil, nil, false)
     local goldCost = GetQuestMoneyToGet and GetQuestMoneyToGet() or 0
@@ -173,6 +213,7 @@ AQG:RegisterEvent("QUEST_PROGRESS", function()
         AQG:DebugSeparator("QUEST_PROGRESS")
         AQG:Print(title, "(ID:", questID or "?", "| Type:", qType .. ")")
         AQG:DebugQuestAPIs(questID)
+
         if not completable then
             AQG:Print("-> Not completable yet. Would NOT advance.")
         elseif goldCost > 0 then
@@ -202,13 +243,16 @@ AQG:RegisterEvent("QUEST_PROGRESS", function()
     CompleteQuest()
 end)
 
--- QUEST_COMPLETE: finalize turn-in if there's no reward choice to make
+-- QUEST_COMPLETE:
+-- finalize turn-in if there's no reward choice to make
 AQG:RegisterEvent("QUEST_COMPLETE", function()
     local db = AutoQuestGossipDB
-    if not db.questEnabled or not db.questTurnInEnabled or not AQG:ShouldProceed() then return end
+    if not db.questEnabled or
+       not db.questTurnInEnabled or
+       not AQG:ShouldProceed() then return end
 
     local questID = GetQuestID()
-    local title = GetTitleText() or (questID and C_QuestLog.GetTitleForQuestID(questID)) or "?"
+    local title = QuestTitle(questID)
     local qType = questID and questID ~= 0 and QuestType(questID, nil, nil) or "?"
     local numChoices = GetNumQuestChoices()
     local allowed = not questID or questID == 0 or AQG:ShouldAutomate(questID, nil, nil, nil, false)
@@ -243,17 +287,21 @@ AQG:RegisterEvent("QUEST_COMPLETE", function()
     end
 end)
 
--- QUEST_AUTOCOMPLETE: handle quests completed via the objective tracker
+-- QUEST_AUTOCOMPLETE:
+-- handle quests completed via the objective tracker
 AQG:RegisterEvent("QUEST_AUTOCOMPLETE", function(questID)
     local db = AutoQuestGossipDB
-    if not db.questEnabled or not db.questTurnInEnabled or not AQG:ShouldProceed() then return end
+    if not db.questEnabled or
+       not db.questTurnInEnabled or
+       not AQG:ShouldProceed() then return end
 
     local index = C_QuestLog.GetLogIndexForQuestID(questID)
     if not index then return end
+
     local info = C_QuestLog.GetInfo(index)
     if not info or not info.isAutoComplete then return end
 
-    local title = info.title or C_QuestLog.GetTitleForQuestID(questID) or "?"
+    local title = info.title or QuestTitle(questID)
     local qType = QuestType(questID, nil, nil)
     local allowed = AQG:ShouldAutomate(questID, nil, nil, nil, false)
 

@@ -13,7 +13,8 @@ local SAFE_ICONS = {
 }
 
 local function IsVendorOption(option)
-    return option.icon == ICON_VENDOR or (option.overrideIconID and option.overrideIconID == ICON_VENDOR)
+    return option.icon == ICON_VENDOR or (option.overrideIconID and
+                                          option.overrideIconID == ICON_VENDOR)
 end
 
 local function IconTag(option)
@@ -44,14 +45,17 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     local MAX_GOSSIP_OPTIONS = 8
     if #options > MAX_GOSSIP_OPTIONS then
         AQG:Debug("NPC has", #options, "gossip options (>" .. MAX_GOSSIP_OPTIONS .. "). Likely a guard — skipping.")
+
         return
     end
 
+    -- TODO: Figure outhow to handle dragonriding NPC's
+
     -- Check if the NPC is offering any quests (active or available).
     -- If so, don't auto-select gossip — the player should choose manually.
-    local activeQuests = C_GossipInfo.GetActiveQuests()
+    local    activeQuests = C_GossipInfo.GetActiveQuests()
     local availableQuests = C_GossipInfo.GetAvailableQuests()
-    local hasQuests = (#activeQuests > 0) or (#availableQuests > 0)
+    local       hasQuests = (#activeQuests > 0) or (#availableQuests > 0)
 
     -- Check for skip/important text in gossip options
     local hasSkip, hasImportant = AQG:GossipHasDangerousOption()
@@ -64,6 +68,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     for _, option in ipairs(options) do
         if option.gossipOptionID and not IsSafeIcon(option) then
             hasUnknownIcon = true
+
             break
         end
     end
@@ -82,6 +87,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     if db.debugEnabled then
         AQG:DebugSeparator("GOSSIP_SHOW (Gossip)")
         AQG:Print("Gossip options (" .. #options .. "):")
+
         for i, option in ipairs(options) do
             local id = option.gossipOptionID or "nil"
             local autoSelect = option.selectOptionWhenOnlyOption and (blizzardHandled and " [Blizzard handling]" or " [auto-select flag]") or ""
@@ -130,16 +136,17 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
 
     -- Dev mode: block automation after printing
     if db.devMode then return end
+    
+    -- Skip/important already warned by Quest.lua — just block gossip too
+    if hasSkip or hasImportant then return end
 
     -- If NPC has quests, don't auto-select gossip
     if hasQuests then return end
 
-    -- Skip/important already warned by Quest.lua — just block gossip too
-    if hasSkip or hasImportant then return end
-
     -- If any option has an unknown icon type, pause and let user handle manually
     if hasUnknownIcon then
         AQG:Warn("Unknown gossip type detected — automation paused.")
+
         return
     end
 
@@ -147,12 +154,15 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     local function SelectGossip(option)
         if selectedGossipIDs[option.gossipOptionID] then
             AQG:Warn("Gossip loop detected — automation paused.")
+
             return false
         end
+
         selectedGossipIDs[option.gossipOptionID] = true
         AQG:Verbose("Gossip:", IconTag(option) .. (option.name or "?"), "(ID:", option.gossipOptionID .. ")")
         AQG:Debug("Auto-select gossip:", IconTag(option) .. (option.name or "?"), "(ID:", option.gossipOptionID .. ")")
         C_GossipInfo.SelectOption(option.gossipOptionID)
+
         return true
     end
 
@@ -162,12 +172,14 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     -- If Blizzard flagged an option for auto-select (multiple options), follow their lead
     if autoSelectOption then
         SelectGossip(options[autoSelectOption])
+
         return
     end
 
     -- If there's a vendor option, prefer it over regular gossip
     if vendorOption then
         SelectGossip(options[vendorOption])
+
         return
     end
 
@@ -177,6 +189,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
             -- Only skip if Blizzard is actually handling it (single option with the flag)
             if blizzardHandled and option.selectOptionWhenOnlyOption then return end
             SelectGossip(option)
+
             return
         end
     end

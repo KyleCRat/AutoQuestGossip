@@ -4,23 +4,25 @@ local addonName, AQG = ...
 local ADDON_COLOR = "|cff00ccff"
 local SEPARATOR = ADDON_COLOR .. "--- AQG ----------------------------------------|r"
 
+local QuestAccountComplete = C_QuestLog.IsQuestFlaggedCompletedOnAccount
+
 local CONTENT_TAG_MAP = {
-    [1] = "contentGroup",
-    [41] = "contentPvP",
-    [62] = "contentRaid",
-    [81] = "contentDungeon",
-    [85] = "contentDungeon",       -- Heroic
-    [88] = "contentRaid",          -- Raid (10)
-    [89] = "contentRaid",          -- Raid (25)
-    [113] = "contentPvP",          -- PVP World Quest
-    [137] = "contentDungeon",      -- Dungeon World Quest
-    [141] = "contentRaid",         -- Raid World Quest
-    [145] = "contentDungeon",      -- Legionfall Dungeon World Quest
-    [255] = "contentPvP",          -- War Mode PvP
-    [256] = "contentPvP",          -- PvP Conquest
-    [278] = "contentPvP",          -- PVP Elite World Quest
-    [288] = "contentDelve",        -- Delve
-    [289] = "contentWorldBoss",    -- World Boss
+      [1] = "contentGroup",
+     [41] = "contentPvP",
+     [62] = "contentRaid",
+     [81] = "contentDungeon",
+     [85] = "contentDungeon",   -- Heroic
+     [88] = "contentRaid",      -- Raid (10)
+     [89] = "contentRaid",      -- Raid (25)
+    [113] = "contentPvP",       -- PVP World Quest
+    [137] = "contentDungeon",   -- Dungeon World Quest
+    [141] = "contentRaid",      -- Raid World Quest
+    [145] = "contentDungeon",   -- Legionfall Dungeon World Quest
+    [255] = "contentPvP",       -- War Mode PvP
+    [256] = "contentPvP",       -- PvP Conquest
+    [278] = "contentPvP",       -- PVP Elite World Quest
+    [288] = "contentDelve",     -- Delve
+    [289] = "contentWorldBoss", -- World Boss
 }
 
 -- Default settings
@@ -66,10 +68,12 @@ AQG.questHandled = false -- flag to prevent gossip firing after quest selection
 
 local function IsModifierDown()
     local key = AutoQuestGossipDB.modifierKey
-    if key == "SHIFT" then return IsShiftKeyDown()
-    elseif key == "CTRL" then return IsControlKeyDown()
-    elseif key == "ALT" then return IsAltKeyDown()
+
+    if     key == "SHIFT" then return IsShiftKeyDown()
+    elseif key == "CTRL"  then return IsControlKeyDown()
+    elseif key == "ALT"   then return IsAltKeyDown()
     end
+
     return false
 end
 
@@ -78,6 +82,7 @@ function AQG:ShouldProceed()
         self:Debug("Modifier key held — automation paused.")
         return false
     end
+
     return true
 end
 
@@ -89,11 +94,13 @@ function AQG:ClassifyQuest(questID, frequency, isTrivial, isMeta)
 
     -- Check C_QuestLog.GetQuestTagInfo for additional data
     local tagInfo = questID and C_QuestLog.GetQuestTagInfo and C_QuestLog.GetQuestTagInfo(questID)
+
     if tagInfo then
         -- worldQuestType indicates world quests which are often dailies
         if not isDaily and not isWeekly and tagInfo.worldQuestType then
             isDaily = true
         end
+
         -- tagID 284 = Meta Quest
         if tagInfo.tagID == 284 then
             isMetaQuest = true
@@ -108,36 +115,45 @@ function AQG:ClassifyQuest(questID, frequency, isTrivial, isMeta)
     end
 
     local isTrivialQuest = isTrivial or (C_QuestLog.IsQuestTrivial and C_QuestLog.IsQuestTrivial(questID))
-    local isWarboundCompleted = C_QuestLog.IsQuestFlaggedCompletedOnAccount
-        and C_QuestLog.IsQuestFlaggedCompletedOnAccount(questID)
+
+    local isWarboundCompleted = QuestAccountComplete and QuestAccountComplete(questID)
+
     return isDaily, isWeekly, isTrivialQuest, isWarboundCompleted, isMetaQuest
 end
 
 function AQG:DebugQuestAPIs(questID)
     if not AutoQuestGossipDB.debugEnabled then return end
     self:Print("  Raw APIs:")
+
     if QuestIsDaily then
         self:Print("    QuestIsDaily() = " .. tostring(QuestIsDaily()))
     end
+
     if QuestIsWeekly then
         self:Print("    QuestIsWeekly() = " .. tostring(QuestIsWeekly()))
     end
+
     if questID then
         if C_QuestLog.IsQuestTrivial then
             self:Print("    IsQuestTrivial = " .. tostring(C_QuestLog.IsQuestTrivial(questID)))
         end
+
         if C_QuestLog.IsQuestFlaggedCompletedOnAccount then
             self:Print("    WarboundCompleted = " .. tostring(C_QuestLog.IsQuestFlaggedCompletedOnAccount(questID)))
         end
+
         if C_QuestLog.IsRepeatableQuest then
             self:Print("    IsRepeatable = " .. tostring(C_QuestLog.IsRepeatableQuest(questID)))
         end
+
         local tagInfo = C_QuestLog.GetQuestTagInfo and C_QuestLog.GetQuestTagInfo(questID)
+
         if tagInfo then
             self:Print("    tagID = " .. tostring(tagInfo.tagID))
             self:Print("    tagName = " .. tostring(tagInfo.tagName))
             self:Print("    worldQuestType = " .. tostring(tagInfo.worldQuestType))
             local contentKey = CONTENT_TAG_MAP[tagInfo.tagID]
+
             if contentKey then
                 self:Print("    contentFilter = " .. contentKey)
             end
@@ -149,17 +165,21 @@ end
 
 function AQG:GetContentFilterKey(questID)
     local tagInfo = questID and C_QuestLog.GetQuestTagInfo and C_QuestLog.GetQuestTagInfo(questID)
+
     if tagInfo and tagInfo.tagID then
         return CONTENT_TAG_MAP[tagInfo.tagID]
     end
+
     return nil
 end
 
 function AQG:ShouldAllowContent(questID)
     local key = self:GetContentFilterKey(questID)
+
     if key then
         return AutoQuestGossipDB[key]
     end
+
     return true -- no content tag = always allow
 end
 
@@ -186,24 +206,29 @@ function AQG:GossipHasDangerousOption()
     return hasSkip, hasImportant
 end
 
--- Check if a quest needs currency tokens
+-- Check if a quest needs currency
 function AQG:QuestItemIsCurrency()
     local currenciesRequired = GetNumQuestCurrencies and GetNumQuestCurrencies() or 0
+
     return currenciesRequired > 0
 end
 
 -- Check if a quest needs crafting reagents
 function AQG:QuestItemIsReagent()
     local count = GetNumQuestItems and GetNumQuestItems() or 0
+
     for i = 1, count do
         local name, _, _, _, _, itemID = GetQuestItemInfo("required", i)
+
         if name and itemID then
             local isReagent = select(17, C_Item.GetItemInfo(itemID))
+
             if isReagent then
                 return true, name
             end
         end
     end
+
     return false
 end
 
@@ -220,14 +245,17 @@ function AQG:ShouldAutomate(questID, frequency, isTrivial, isMeta, isAccept)
     if weekly then return db[prefix .. "Weekly"] end
     if trivial then return db[prefix .. "Trivial"] end
     if warbound then return db[prefix .. "WarboundCompleted"] end
+
     return db[prefix .. "Regular"]
 end
 
 local function ArgsToString(...)
     local parts = {}
+
     for i = 1, select("#", ...) do
         parts[i] = tostring(select(i, ...))
     end
+
     return table.concat(parts, " ")
 end
 
@@ -239,8 +267,10 @@ end
 function AQG:Print(...)
     if AutoQuestGossipDB and AutoQuestGossipDB.debugEnabled and self.PanelPrint then
         self:PanelPrint(ArgsToString(...))
+
         if PanelIsShown() then return end
     end
+
     print(ADDON_COLOR .. "AQG:|r", ...)
 end
 
@@ -249,6 +279,7 @@ function AQG:Warn(...)
     if AutoQuestGossipDB and AutoQuestGossipDB.debugEnabled and self.PanelPrint then
         self:PanelPrint("|cffff4444[!] " .. ArgsToString(...) .. "|r")
     end
+
     print(ADDON_COLOR .. "AQG:|r |cffff4444\124TInterface\\DialogFrame\\UI-Dialog-Icon-AlertNew:0|t", ..., "|r")
 end
 
@@ -268,21 +299,19 @@ end
 
 -- DebugSeparator: section header in the debug panel
 function AQG:DebugSeparator(event)
-    if AutoQuestGossipDB.debugEnabled then
-        if self.PanelPrint then
-            self:PanelPrint("|cff00ccff--- " .. event .. " ---|r")
-            -- Ensure panel is visible (fallback if OnShow hook missed)
-            if self.ShowPanel then
-                local anchor = (DUIQuestFrame and DUIQuestFrame:IsShown() and DUIQuestFrame)
-                    or (GossipFrame and GossipFrame:IsShown() and GossipFrame)
-                    or (QuestFrame and QuestFrame:IsShown() and QuestFrame)
-                if anchor then self:ShowPanel(anchor) end
-            end
-        end
-        if not PanelIsShown() then
-            print(SEPARATOR)
-            print(ADDON_COLOR .. "AQG:|r", "[" .. event .. "]")
-        end
+    if not AutoQuestGossipDB.debugEnabled or
+       not self.PanelPrint then return end
+
+    self:PanelPrint("|cff00ccff--- " .. event .. " ---|r")
+
+    -- Ensure panel is visible (fallback if OnShow hook missed)
+    if self.ShowPanel then
+        local anchor =
+            (DUIQuestFrame and DUIQuestFrame:IsShown() and DUIQuestFrame)
+            or (GossipFrame and GossipFrame:IsShown() and GossipFrame)
+            or (QuestFrame and QuestFrame:IsShown() and QuestFrame)
+
+        if anchor then self:ShowPanel(anchor) end
     end
 end
 
@@ -294,25 +323,29 @@ frame:RegisterEvent("ADDON_LOADED")
 frame:SetScript("OnEvent", function(self, event, ...)
     if event == "ADDON_LOADED" then
         local name = ...
+
         if name == addonName then
             -- Initialize saved variables with defaults
             if not AutoQuestGossipDB then
                 AutoQuestGossipDB = {}
             end
+
             for k, v in pairs(defaults) do
                 if AutoQuestGossipDB[k] == nil then
                     AutoQuestGossipDB[k] = v
                 end
             end
+
             self:UnregisterEvent("ADDON_LOADED")
 
             -- Fire module init callbacks
             if AQG.onInit then
-                for _, fn in ipairs(AQG.onInit) do
-                    fn()
+                for _, function in ipairs(AQG.onInit) do
+                    function()
                 end
             end
         end
+
         return
     end
 
@@ -326,10 +359,12 @@ end)
 
 function AQG:RegisterEvent(event, handler)
     if not self.handlers then self.handlers = {} end
+
     if not self.handlers[event] then
         self.handlers[event] = {}
         self.frame:RegisterEvent(event)
     end
+
     table.insert(self.handlers[event], handler)
 end
 
@@ -341,11 +376,13 @@ end
 SLASH_AUTOQUESTGOSSIP1 = "/aqg"
 SlashCmdList["AUTOQUESTGOSSIP"] = function(msg)
     local cmd = strtrim(msg):lower()
+
     if cmd == "debug" then
         if not AutoQuestGossipDB.debugEnabled then
             AutoQuestGossipDB.debugEnabled = true
             AQG:Print("Debug mode enabled.")
         end
+
         if AQG.ToggleDetachedPanel then
             AQG:ToggleDetachedPanel()
         end
