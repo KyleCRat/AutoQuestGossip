@@ -75,9 +75,7 @@ content:SetText("")
 content:SetScript("OnEscapePressed", function(self)
     self:ClearFocus()
 end)
-content:SetScript("OnEditFocusGained", function(self)
-    self:HighlightText()
-end)
+
 content:SetScript("OnTextChanged", function(self, userInput)
     if userInput then
         self:SetText(table.concat(lines, "\n"))

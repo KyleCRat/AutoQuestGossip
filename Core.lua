@@ -4,6 +4,8 @@ local addonName, AQG = ...
 local ADDON_COLOR = "|cff00ccff"
 local SEPARATOR = ADDON_COLOR .. "--- AQG ----------------------------------------|r"
 
+local RETRY_TIME_DELAY = .25
+
 local QuestAccountComplete = C_QuestLog.IsQuestFlaggedCompletedOnAccount
 
 local CONTENT_TAG_MAP = {
@@ -79,7 +81,8 @@ end
 
 function AQG:PausedByModKey()
     if IsModifierDown() then
-        self:Debug("-> Modifier key held — automation paused.")
+        self:Debug("|cffff4444-> Modifier key held"
+            .. " — automation paused.|r")
         return true
     end
 
@@ -183,6 +186,44 @@ function AQG:ShouldAllowContent(questID)
     return true -- no content tag = always allow
 end
 
+function AQG:IsQuestDataReady(questID, funcToRetry)
+    if not questID or questID == 0 then
+        return true
+    end
+
+    if C_QuestLog.GetTitleForQuestID(questID) then
+        return true
+    end
+
+    if funcToRetry then
+        self:Print("|cffff4444[!] Quest data not cached,"
+            .. " retrying...|r")
+        C_Timer.After(RETRY_TIME_DELAY, funcToRetry)
+    end
+
+    return false
+end
+
+function AQG:AreQuestsCached(quests, funcToRetry)
+    for _, quest in ipairs(quests) do
+        local id = quest.questID
+
+        if id and id ~= 0
+            and not C_QuestLog.GetTitleForQuestID(id) then
+
+            if funcToRetry then
+                self:Print("|cffff4444[!] Quest data not cached,"
+                    .. " retrying...|r")
+                C_Timer.After(RETRY_TIME_DELAY, funcToRetry)
+            end
+
+            return false
+        end
+    end
+
+    return true
+end
+
 function AQG:GetNPCName()
     return UnitName("npc") or "?"
 end
@@ -279,6 +320,12 @@ local function PanelIsShown()
     return AQGDebugPanel and AQGDebugPanel:IsShown()
 end
 
+--- TODO: Review and re-implement the PRINT, DEBUG, WARN, VERBOSE printers.
+--- We need to add proper verbose messages places, as just having "print"
+--- is eating messages via the debug panel. We need to specifically put a
+--- debug print and a verbose print for each action. While keeping warn for
+--- handling situations where more important things are happening.
+
 -- Print: detailed debug output to panel (when debug/dev enabled), fallback to chat
 function AQG:Print(...)
     if AutoQuestGossipDB and AutoQuestGossipDB.debugEnabled and self.PanelPrint then
@@ -306,10 +353,10 @@ function AQG:Verbose(...)
     end
 end
 
--- Debug: detailed output, only when debugEnabled
+-- Debug: detailed output to panel only, never to chat
 function AQG:Debug(...)
-    if AutoQuestGossipDB.debugEnabled then
-        self:Print(...)
+    if AutoQuestGossipDB.debugEnabled and self.PanelPrint then
+        self:PanelPrint(ArgsToString(...))
     end
 end
 

@@ -33,7 +33,7 @@ end
 
 -- GOSSIP_SHOW:
 -- auto-select available and completable quests from the gossip window
-AQG:RegisterEvent("GOSSIP_SHOW", function()
+local function OnGossipShow()
     AQG.questHandled = false
     local db = AutoQuestGossipDB
 
@@ -52,6 +52,17 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
 
     local activeQuests = C_GossipInfo.GetActiveQuests()
     local availableQuests = C_GossipInfo.GetAvailableQuests()
+
+    -- Wait for quest data if not yet cached
+    if not AQG:AreQuestsCached(activeQuests, OnGossipShow) then
+
+        return
+    end
+
+    if not AQG:AreQuestsCached(availableQuests, OnGossipShow) then
+
+        return
+    end
 
     -- Debug: print detailed info to debug panel
     if db.debugEnabled then
@@ -115,7 +126,9 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
             end
         end
     end
-end)
+end
+
+AQG:RegisterEvent("GOSSIP_SHOW", OnGossipShow)
 
 -- QUEST_ACCEPT_CONFIRM:
 -- auto-confirm escort/shared quests started by another player
@@ -146,7 +159,7 @@ end)
 
 -- QUEST_DETAIL:
 -- auto-accept the offered quest
-AQG:RegisterEvent("QUEST_DETAIL", function()
+local function OnQuestDetail()
     local db = AutoQuestGossipDB
     if not db.questEnabled or
        not db.questAcceptEnabled or
@@ -154,6 +167,11 @@ AQG:RegisterEvent("QUEST_DETAIL", function()
 
     local questID = GetQuestID()
     if not questID or questID == 0 then return end
+
+    if not AQG:IsQuestDataReady(questID, OnQuestDetail) then
+
+        return
+    end
 
     local title = QuestTitle(questID)
     local qType = QuestType(questID, nil, nil)
@@ -189,18 +207,26 @@ AQG:RegisterEvent("QUEST_DETAIL", function()
     else
         AcceptQuest()
     end
-end)
+end
+
+AQG:RegisterEvent("QUEST_DETAIL", OnQuestDetail)
 
 -- QUEST_PROGRESS:
 -- advance to the completion/reward step
-AQG:RegisterEvent("QUEST_PROGRESS", function()
+local function OnQuestProgress()
     local db = AutoQuestGossipDB
     if not db.questEnabled or
        not db.questTurnInEnabled or
        AQG:PausedByModKey() then return end
 
-    local completable = IsQuestCompletable()
     local questID = GetQuestID()
+
+    if not AQG:IsQuestDataReady(questID, OnQuestProgress) then
+
+        return
+    end
+
+    local completable = IsQuestCompletable()
     local title = QuestTitle()
     local qType = questID and questID ~= 0 and QuestType(questID, nil, nil) or "?"
     local allowed = questID and questID ~= 0 and AQG:ShouldAutomate(questID, nil, nil, nil, false)
@@ -241,17 +267,25 @@ AQG:RegisterEvent("QUEST_PROGRESS", function()
     AQG:Verbose("Turn-in:", title, "(ID:", questID or "?", "| Type:", qType .. ")")
     AQG:Debug("Auto turn-in (progress):", title, "(ID:", questID or "?", "| Type:", qType .. ")")
     CompleteQuest()
-end)
+end
+
+AQG:RegisterEvent("QUEST_PROGRESS", OnQuestProgress)
 
 -- QUEST_COMPLETE:
 -- finalize turn-in if there's no reward choice to make
-AQG:RegisterEvent("QUEST_COMPLETE", function()
+local function OnQuestComplete()
     local db = AutoQuestGossipDB
     if not db.questEnabled or
        not db.questTurnInEnabled or
        AQG:PausedByModKey() then return end
 
     local questID = GetQuestID()
+
+    if not AQG:IsQuestDataReady(questID, OnQuestComplete) then
+
+        return
+    end
+
     local title = QuestTitle(questID)
     local qType = questID and questID ~= 0 and QuestType(questID, nil, nil) or "?"
     local numChoices = GetNumQuestChoices()
@@ -285,11 +319,16 @@ AQG:RegisterEvent("QUEST_COMPLETE", function()
         AQG:Debug("Auto turn-in (complete):", title, "(ID:", questID or "?", "| Type:", qType .. ")")
         GetQuestReward(numChoices)
     end
-end)
+end
+
+AQG:RegisterEvent("QUEST_COMPLETE", OnQuestComplete)
 
 -- QUEST_AUTOCOMPLETE:
 -- handle quests completed via the objective tracker
-AQG:RegisterEvent("QUEST_AUTOCOMPLETE", function(questID)
+local autocompleteQuestID
+
+local function OnQuestAutocomplete()
+    local questID = autocompleteQuestID
     local db = AutoQuestGossipDB
     if not db.questEnabled or
        not db.questTurnInEnabled or
@@ -301,6 +340,11 @@ AQG:RegisterEvent("QUEST_AUTOCOMPLETE", function(questID)
     local info = C_QuestLog.GetInfo(index)
     if not info or not info.isAutoComplete then return end
 
+    if not AQG:IsQuestDataReady(questID, OnQuestAutocomplete) then
+
+        return
+    end
+
     local title = info.title or QuestTitle(questID)
     local qType = QuestType(questID, nil, nil)
     local allowed = AQG:ShouldAutomate(questID, nil, nil, nil, false)
@@ -309,7 +353,8 @@ AQG:RegisterEvent("QUEST_AUTOCOMPLETE", function(questID)
         AQG:DebugSeparator("QUEST_AUTOCOMPLETE")
         AQG:Print(title, "(ID:", questID or "?", "| Type:", qType .. ")")
         if not allowed then
-            AQG:Print("-> Filtered out by settings. Would NOT show completion.")
+            AQG:Print("-> Filtered out by settings."
+                .. " Would NOT show completion.")
         else
             AQG:Print("-> Would show quest completion dialog.")
         end
@@ -318,8 +363,15 @@ AQG:RegisterEvent("QUEST_AUTOCOMPLETE", function(questID)
     if db.devMode then return end
     if not allowed then return end
 
-    AQG:Verbose("Auto-complete:", title, "(ID:", questID, "| Type:", qType .. ")")
-    AQG:Debug("Auto-complete (tracker):", title, "(ID:", questID, "| Type:", qType .. ")")
+    AQG:Verbose("Auto-complete:", title,
+        "(ID:", questID, "| Type:", qType .. ")")
+    AQG:Debug("Auto-complete (tracker):", title,
+        "(ID:", questID, "| Type:", qType .. ")")
     C_QuestLog.SetSelectedQuest(questID)
     ShowQuestComplete(C_QuestLog.GetSelectedQuest())
+end
+
+AQG:RegisterEvent("QUEST_AUTOCOMPLETE", function(questID)
+    autocompleteQuestID = questID
+    OnQuestAutocomplete()
 end)

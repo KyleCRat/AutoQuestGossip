@@ -128,24 +128,6 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
         return
     end
 
-    -- If this NPC matches a blocked name, exit
-    local npcName = AQG:GetNPCName()
-    for _, name in ipairs(AQG.BlockedNPCNames) do
-        if npcName:find(name) then
-            AQG:Debug("-> NPC name matches blocked:", name)
-
-            return
-        end
-    end
-
-    -- If there is only one gossip option and Blizzard has tagged it as
-    -- an auto-select option, let blizzard handle the interaction, exit
-    if #options == 1 and options[1].selectOptionWhenOnlyOption then
-        AQG:Debug("-> Blizzard handling single option.")
-
-        return
-    end
-
     -- Check if the NPC is offering any quests (active or available).
     -- If so, don't auto-select gossip — the player should choose manually.
     local    activeQuests = C_GossipInfo.GetActiveQuests()
@@ -177,6 +159,24 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
 
     -- Debug: print gossip option listing
     DebugGossipOptions(options, blizzardHandled)
+
+    -- If this NPC matches a blocked name, exit
+    local npcName = AQG:GetNPCName()
+    for _, name in ipairs(AQG.BlockedNPCNames) do
+        if npcName:find(name) then
+            AQG:Debug("-> NPC name matches blocked:", name)
+
+            return
+        end
+    end
+
+    -- If there is only one gossip option and Blizzard has tagged it as
+    -- an auto-select option, let blizzard handle the interaction, exit
+    if #options == 1 and options[1].selectOptionWhenOnlyOption then
+        AQG:Debug("-> Blizzard handling single option.")
+
+        return
+    end
 
     -- Guard clauses
     if hasSkip then
