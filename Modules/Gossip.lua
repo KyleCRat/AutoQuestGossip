@@ -120,6 +120,24 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     -- If we have the mod key pressed, exit
     if AQG:PausedByModKey() then return end
 
+    -- If this NPC is on the blocked ID list, exit
+    local npcID = AQG:GetNPCID()
+    if AQG.BlockedNPCIDs[npcID] then
+        AQG:Debug("-> NPC ID", npcID, "is blocked.")
+
+        return
+    end
+
+    -- If this NPC matches a blocked name, exit
+    local npcName = AQG:GetNPCName()
+    for _, name in ipairs(AQG.BlockedNPCNames) do
+        if npcName:find(name) then
+            AQG:Debug("-> NPC name matches blocked:", name)
+
+            return
+        end
+    end
+
     -- If there is only one gossip option and Blizzard has tagged it as
     -- an auto-select option, let blizzard handle the interaction, exit
     if #options == 1 and options[1].selectOptionWhenOnlyOption then
