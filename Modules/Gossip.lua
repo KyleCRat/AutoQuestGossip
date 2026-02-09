@@ -118,15 +118,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     if AQG.questHandled then return end
 
     -- If we have the mod key pressed, exit
-    if AQG:PausedByModKey() then return end
-
-    -- If this NPC is on the blocked ID list, exit
-    local npcID = AQG:GetNPCID()
-    if AQG.BlockedNPCIDs[npcID] then
-        AQG:Debug("-> NPC ID", npcID, "is blocked.")
-
-        return
-    end
+    if AQG:PausedByModKey("Gossip") then return end
 
     -- Check if the NPC is offering any quests (active or available).
     -- If so, don't auto-select gossip — the player should choose manually.
@@ -137,28 +129,48 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     -- Check for skip/important text in gossip options
     local hasSkip, hasImportant = AQG:GossipHasDangerousOption()
 
+    -- Find vendor option
+    -- auto-select flagged option
     -- Check for unknown (non-gossip, non-vendor) icon types
+    local vendorOption
+    local autoSelectOption
     local hasUnknownIcon = false
-    for _, option in ipairs(options) do
-        if option.gossipOptionID and not IsSafeIcon(option) then
-            hasUnknownIcon = true
 
-            break
-        end
-    end
-
-    -- Find vendor option, auto-select flagged option, and first valid gossip option
-    local vendorOption, autoSelectOption, firstOption
     for i, option in ipairs(options) do
         if option.gossipOptionID then
-            if not vendorOption and IsVendorOption(option) then vendorOption = i end
-            if not autoSelectOption and not blizzardHandled and option.selectOptionWhenOnlyOption then autoSelectOption = i end
-            if not firstOption and not (blizzardHandled and option.selectOptionWhenOnlyOption) then firstOption = i end
+            if not vendorOption and IsVendorOption(option) then
+                vendorOption = option
+            end
+
+            if not autoSelectOption and option.selectOptionWhenOnlyOption then
+                autoSelectOption = option
+            end
+
+            if not hasUnknownIcon and option.gossipOptionID and
+                                      not IsSafeIcon(option) then
+                hasUnknownIcon = true
+            end
         end
     end
 
     -- Debug: print gossip option listing
-    DebugGossipOptions(options, blizzardHandled)
+    DebugGossipOptions(options)
+
+    -- If there is only one gossip option and Blizzard has tagged it as
+    -- an auto-select option, let blizzard handle the interaction, exit
+    if #options == 1 and options[1].selectOptionWhenOnlyOption then
+        AQG:Debug("-> Blizzard handling single option.")
+
+        return
+    end
+
+    -- If this NPC is on the blocked ID list, exit
+    local npcID = AQG:GetNPCID()
+    if AQG.BlockedNPCIDs[npcID] then
+        AQG:Debug("-> NPC ID", npcID, "is blocked.")
+
+        return
+    end
 
     -- If this NPC matches a blocked name, exit
     local npcName = AQG:GetNPCName()
@@ -168,14 +180,6 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
 
             return
         end
-    end
-
-    -- If there is only one gossip option and Blizzard has tagged it as
-    -- an auto-select option, let blizzard handle the interaction, exit
-    if #options == 1 and options[1].selectOptionWhenOnlyOption then
-        AQG:Debug("-> Blizzard handling single option.")
-
-        return
     end
 
     -- Guard clauses
@@ -213,29 +217,30 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
 
     -- Blizzard-flagged auto select option
     if autoSelectOption then
-        AQG:Debug("-> Would auto-select gossip:",
-                  IconTag(option) .. (option.name or "?"),
-                  "(ID:", option.gossipOptionID .. ")")
-        SelectGossip(options[autoSelectOption])
+        AQG:Debug("-> Would auto-select Blizzard auto-select gossip:",
+                  IconTag(autoSelectOption) .. (autoSelectOption.name or "?"),
+                  "(ID:", autoSelectOption.gossipOptionID .. ")")
+
+        SelectGossip(autoSelectOption)
 
         return
     end
 
     -- If there is a vendor option, prioritize selecting it
     if vendorOption then
-        AQG:Debug("-> Would auto-select gossip:",
-                  IconTag(option) .. (option.name or "?"),
-                  "(ID:", option.gossipOptionID .. ")")
-        SelectGossip(options[vendorOption])
+        AQG:Debug("-> Would auto-select vendor option:",
+                  IconTag(vendorOption) .. (vendorOption.name or "?"),
+                  "(ID:", vendorOption.gossipOptionID .. ")")
+
+        SelectGossip(vendorOption)
 
         return
     end
 
     -- Skip NPCs with too many options (guards, dragonriding, etc.)
     if #options > MAX_GOSSIP_OPTIONS then
-        AQG:Debug("-> NPC has", #options,
-                  "gossip options (>" .. MAX_GOSSIP_OPTIONS .. ").",
-                  "Skipping.")
+        AQG:Debug("-> NPC has", #options, "gossip options",
+                  "(>" .. MAX_GOSSIP_OPTIONS .. ").", "Skipping.")
 
         return
     end
@@ -243,6 +248,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     -- First valid option
     for _, option in ipairs(options) do
         if option.gossipOptionID then
+            AQG:Debug("Selecting:", option.gossipOptionID)
             SelectGossip(option)
 
             return

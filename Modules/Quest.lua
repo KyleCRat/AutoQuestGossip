@@ -3,18 +3,15 @@ local _, AQG = ...
 local GetTitle = C_QuestLog.GetTitleForQuestID
 
 local function QuestType(questID, frequency, isTrivial, isMeta)
-    local daily,
-          weekly,
-          trivial,
-          warbound,
-          meta = AQG:ClassifyQuest(questID, frequency, isTrivial, isMeta)
+    local daily, weekly, trivial, warbound, meta =
+          AQG:ClassifyQuest(questID, frequency, isTrivial, isMeta)
 
-    return meta and "Meta" or
-           daily and "Daily" or
-           weekly and "Weekly" or
-           trivial and "Trivial" or
+    return meta     and "Meta" or
+           daily    and "Daily" or
+           weekly   and "Weekly" or
+           trivial  and "Trivial" or
            warbound and "Warbound" or
-           "Regular"
+                        "Regular"
 end
 
 local function QuestLabel(quest)
@@ -37,15 +34,21 @@ local function OnGossipShow()
     AQG.questHandled = false
     local db = AutoQuestGossipDB
 
-    if not db.questEnabled or
-       AQG:PausedByModKey() then return end
+    if not db.questEnabled then return end
+
+    if AQG:PausedByModKey("Quest") then return end
 
     -- If any gossip option has skip/important text, pause ALL automation (quest + gossip)
     local hasSkip, hasImportant = AQG:GossipHasDangerousOption()
 
     if hasSkip or hasImportant then
-        if hasSkip then AQG:Warn("Skip option detected — automation paused.") end
-        if hasImportant and not hasSkip then AQG:Warn("Important selections detected — automation paused.") end
+        if hasSkip then
+            AQG:Warn("Skip option detected — automation paused.")
+        end
+
+        if hasImportant and not hasSkip then
+            AQG:Warn("Important selections detected — automation paused.")
+        end
 
         return
     end
@@ -136,7 +139,7 @@ AQG:RegisterEvent("QUEST_ACCEPT_CONFIRM", function(playerName, questTitle)
     local db = AutoQuestGossipDB
     if not db.questEnabled or
        not db.questAcceptEnabled or
-       AQG:PausedByModKey() then return end
+       AQG:PausedByModKey("Quest") then return end
 
     local label = (questTitle or "?") .. " (from " .. (playerName or "?") .. ")"
 
@@ -163,7 +166,7 @@ local function OnQuestDetail()
     local db = AutoQuestGossipDB
     if not db.questEnabled or
        not db.questAcceptEnabled or
-       AQG:PausedByModKey() then return end
+       AQG:PausedByModKey("Quest") then return end
 
     local questID = GetQuestID()
     if not questID or questID == 0 then return end
@@ -217,7 +220,7 @@ local function OnQuestProgress()
     local db = AutoQuestGossipDB
     if not db.questEnabled or
        not db.questTurnInEnabled or
-       AQG:PausedByModKey() then return end
+       AQG:PausedByModKey("Quest") then return end
 
     local questID = GetQuestID()
 
@@ -277,7 +280,7 @@ local function OnQuestComplete()
     local db = AutoQuestGossipDB
     if not db.questEnabled or
        not db.questTurnInEnabled or
-       AQG:PausedByModKey() then return end
+       AQG:PausedByModKey("Quest") then return end
 
     local questID = GetQuestID()
 
@@ -332,7 +335,7 @@ local function OnQuestAutocomplete()
     local db = AutoQuestGossipDB
     if not db.questEnabled or
        not db.questTurnInEnabled or
-       AQG:PausedByModKey() then return end
+       AQG:PausedByModKey("Quest") then return end
 
     local index = C_QuestLog.GetLogIndexForQuestID(questID)
     if not index then return end
