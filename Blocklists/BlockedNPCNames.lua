@@ -9,4 +9,7 @@ AQG.BlockedNPCNames = {
     -- Reason: Time-walking NPC that phases you to a different
     --   timeline. Auto-selecting could unexpectedly phase you.
     "Zidormi",
+
+    -- Reason: NPC that handles Mythic Keystone Options. Don't automate.
+    "Lindormi"
 }
