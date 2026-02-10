@@ -170,14 +170,14 @@ AQG:RegisterEvent("QUEST_ACCEPT_CONFIRM", OnQuestAcceptConfirm)
 --- QUEST_DETAIL:
 ---
 --- auto-accept the offered quest
-local function OnQuestDetail()
+local function OnQuestDetail(questID)
     local db = AutoQuestGossipDB
 
     if not db.questEnabled then return end
     if not db.questAcceptEnabled then return end
     if AQG:PausedByModKey("Quest") then return end
 
-    local questID = GetQuestID()
+    questID = questID or GetQuestID()
     if not questID or questID == 0 then return end
 
     if not AQG:IsQuestDataReady(questID, OnQuestDetail) then return end
@@ -223,14 +223,14 @@ AQG:RegisterEvent("QUEST_DETAIL", function() OnQuestDetail() end)
 --- QUEST_PROGRESS:
 ---
 --- advance to the completion/reward step
-local function OnQuestProgress()
+local function OnQuestProgress(questID)
     local db = AutoQuestGossipDB
 
     if not db.questEnabled then return end
     if not db.questTurnInEnabled then return end
     if AQG:PausedByModKey("Quest") then return end
 
-    local questID = GetQuestID()
+    questID = questID or GetQuestID()
 
     if not AQG:IsQuestDataReady(questID, OnQuestProgress) then return end
 
@@ -286,14 +286,14 @@ AQG:RegisterEvent("QUEST_PROGRESS", OnQuestProgress)
 --- QUEST_COMPLETE:
 ---
 --- finalize turn-in if there's no reward choice to make
-local function OnQuestComplete()
+local function OnQuestComplete(questID)
     local db = AutoQuestGossipDB
 
     if not db.questEnabled then return end
     if not db.questTurnInEnabled then return end
     if AQG:PausedByModKey("Quest") then return end
 
-    local questID = GetQuestID()
+    questID = questID or GetQuestID()
 
     if not AQG:IsQuestDataReady(questID, OnQuestComplete) then return end
 
