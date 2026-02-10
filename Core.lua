@@ -217,7 +217,9 @@ function AQG:IsQuestDataReady(questID, funcToRetry)
     if funcToRetry then
         self:Debug("|cffff4444[!] Quest data not cached,"
             .. " retrying...|r")
-        C_Timer.After(RETRY_TIME_DELAY, funcToRetry)
+        C_Timer.After(RETRY_TIME_DELAY, function()
+            funcToRetry(questID)
+        end)
     end
 
     return false
