@@ -49,11 +49,7 @@ local function DebugGossipOptions(options)
         end
 
         if option.selectOptionWhenOnlyOption then
-            if #options == 1 then
-                tags = tags .. " [Blizzard handling]"
-            else
-                tags = tags .. " [auto-select flag]"
-            end
+            tags = tags .. " [Auto-Select]"
         end
 
         if AQG:IsSkipOption(option) then
@@ -156,13 +152,17 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     -- Debug: print gossip option listing
     DebugGossipOptions(options)
 
-    -- If there is only one gossip option and Blizzard has tagged it as
-    -- an auto-select option, let blizzard handle the interaction, exit
-    if #options == 1 and options[1].selectOptionWhenOnlyOption then
-        AQG:Debug("-> Blizzard handling single option.")
-
-        return
-    end
+    -- If there is only one gossip option and Blizzard has tagged it as an
+    -- auto-select option, let blizzard handle the interaction, exit
+    --
+    -- Sometimes Blizzard does not handle this, no reason not to just handle it
+    -- ourselves
+    --
+    -- if #options == 1 and options[1].selectOptionWhenOnlyOption then
+    --     AQG:Debug("-> Blizzard handling single option.")
+    --
+    --     return
+    -- end
 
     -- If this NPC is on the blocked ID list, exit
     local npcID = AQG:GetNPCID()
