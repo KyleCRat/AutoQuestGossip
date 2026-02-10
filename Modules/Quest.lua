@@ -2,9 +2,9 @@ local _, AQG = ...
 
 local GetTitle = C_QuestLog.GetTitleForQuestID
 
-local function QuestType(questID, frequency, isTrivial, isMeta)
+local function QuestType(questOrID)
     local daily, weekly, trivial, warbound, meta =
-          AQG:ClassifyQuest(questID, frequency, isTrivial, isMeta)
+          AQG:ClassifyQuest(questOrID)
 
     return meta     and "Meta" or
            daily    and "Daily" or
@@ -16,10 +16,7 @@ end
 
 local function QuestLabel(quest)
     local title = quest.title or GetTitle(quest.questID) or "?"
-    local questType = QuestType(quest.questID,
-                                quest.frequency,
-                                quest.isTrivial,
-                                quest.isMeta)
+    local questType = QuestType(quest)
 
     return title .. " (ID: " .. quest.questID .. " | Type: " .. questType .. ")"
 end
@@ -76,7 +73,7 @@ local function OnGossipShow()
 
             for _, quest in ipairs(activeQuests) do
                 local complete = quest.isComplete and "COMPLETE" or "incomplete"
-                local allowed = quest.isComplete and AQG:ShouldAutomate(quest.questID, quest.frequency, quest.isTrivial, quest.isMeta, false)
+                local allowed = quest.isComplete and AQG:ShouldTurnIn(quest)
                 local action = allowed and " -> Would auto turn-in" or ""
                 if quest.isComplete and not allowed then action = " -> Filtered out by settings" end
                 if not quest.isComplete then action = " -> Not ready" end
@@ -88,7 +85,7 @@ local function OnGossipShow()
             AQG:Debug("Available quests (accept):")
 
             for _, quest in ipairs(availableQuests) do
-                local allowed = AQG:ShouldAutomate(quest.questID, quest.frequency, quest.isTrivial, quest.isMeta, true)
+                local allowed = AQG:ShouldAccept(quest)
                 local action = allowed and " -> Would auto-accept" or " -> Filtered out by settings"
                 AQG:Debug("  " .. QuestLabel(quest) .. action)
             end
@@ -105,7 +102,7 @@ local function OnGossipShow()
     -- Turn in completed quests
     if db.questTurnInEnabled then
         for _, quest in ipairs(activeQuests) do
-            if quest.isComplete and AQG:ShouldAutomate(quest.questID, quest.frequency, quest.isTrivial, quest.isMeta, false) then
+            if quest.isComplete and AQG:ShouldTurnIn(quest) then
                 AQG:Verbose("Turn-in:", QuestLabel(quest))
                 AQG:Debug("Auto turn-in:", QuestLabel(quest))
                 C_GossipInfo.SelectActiveQuest(quest.questID)
@@ -119,7 +116,7 @@ local function OnGossipShow()
     -- Accept available quests
     if db.questAcceptEnabled then
         for _, quest in ipairs(availableQuests) do
-            if AQG:ShouldAutomate(quest.questID, quest.frequency, quest.isTrivial, quest.isMeta, true) then
+            if AQG:ShouldAccept(quest) then
                 AQG:Verbose("Accept:", QuestLabel(quest))
                 AQG:Debug("Auto-accept:", QuestLabel(quest))
                 C_GossipInfo.SelectAvailableQuest(quest.questID)
@@ -177,9 +174,9 @@ local function OnQuestDetail()
     end
 
     local title = QuestTitle(questID)
-    local qType = QuestType(questID, nil, nil)
+    local qType = QuestType(questID)
     local goldCost = GetQuestMoneyToGet and GetQuestMoneyToGet() or 0
-    local allowed = AQG:ShouldAutomate(questID, nil, nil, nil, true)
+    local allowed = AQG:ShouldAccept(questID)
 
     -- Debug: print detailed info to debug panel
     if db.debugEnabled then
@@ -231,8 +228,10 @@ local function OnQuestProgress()
 
     local completable = IsQuestCompletable()
     local title = QuestTitle()
-    local qType = questID and questID ~= 0 and QuestType(questID, nil, nil) or "?"
-    local allowed = questID and questID ~= 0 and AQG:ShouldAutomate(questID, nil, nil, nil, false)
+    local qType = questID and questID ~= 0
+                  and QuestType(questID) or "?"
+    local allowed = questID and questID ~= 0
+                    and AQG:ShouldTurnIn(questID)
     local goldCost = GetQuestMoneyToGet and GetQuestMoneyToGet() or 0
     local requiresCurrency = AQG:QuestItemIsCurrency()
     local requiresReagent, reagentName = AQG:QuestItemIsReagent()
@@ -284,15 +283,14 @@ local function OnQuestComplete()
 
     local questID = GetQuestID()
 
-    if not AQG:IsQuestDataReady(questID, OnQuestComplete) then
-
-        return
-    end
+    if not AQG:IsQuestDataReady(questID, OnQuestComplete) then return end
 
     local title = QuestTitle(questID)
-    local qType = questID and questID ~= 0 and QuestType(questID, nil, nil) or "?"
+    local qType = questID and questID ~= 0
+                  and QuestType(questID) or "?"
     local numChoices = GetNumQuestChoices()
-    local allowed = not questID or questID == 0 or AQG:ShouldAutomate(questID, nil, nil, nil, false)
+    local allowed = not questID or questID == 0
+                    or AQG:ShouldTurnIn(questID)
     local goldCost = GetQuestMoneyToGet and GetQuestMoneyToGet() or 0
 
     -- Debug: print detailed info to debug panel
@@ -333,6 +331,7 @@ local autocompleteQuestID
 local function OnQuestAutocomplete()
     local questID = autocompleteQuestID
     local db = AutoQuestGossipDB
+
     if not db.questEnabled or
        not db.questTurnInEnabled or
        AQG:PausedByModKey("Quest") then return end
@@ -349,8 +348,8 @@ local function OnQuestAutocomplete()
     end
 
     local title = info.title or QuestTitle(questID)
-    local qType = QuestType(questID, nil, nil)
-    local allowed = AQG:ShouldAutomate(questID, nil, nil, nil, false)
+    local qType = QuestType(questID)
+    local allowed = AQG:ShouldTurnIn(questID)
 
     if db.debugEnabled then
         AQG:DebugSeparator("QUEST_AUTOCOMPLETE")

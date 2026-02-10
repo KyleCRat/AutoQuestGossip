@@ -90,11 +90,17 @@ function AQG:PausedByModKey(module_name)
     return false
 end
 
-function AQG:ClassifyQuest(questID, frequency, isTrivial, isMeta)
-    -- Check daily: gossip frequency field, QuestIsDaily(), or tag info
-    local isDaily = (frequency == 2) or (QuestIsDaily and QuestIsDaily())
-    local isWeekly = (frequency == 3) or (QuestIsWeekly and QuestIsWeekly())
-    local isMetaQuest = isMeta or false
+function AQG:ClassifyQuest(questOrID)
+    local quest = type(questOrID) == "table"
+                  and questOrID or { questID = questOrID }
+
+    local questID = quest.questID
+    -- Enum.QuestFrequency: 0=Default, 1=Daily, 2=Weekly
+    local isDaily = (quest.frequency == 1)
+                    or (QuestIsDaily and QuestIsDaily())
+    local isWeekly = (quest.frequency == 2)
+                     or (QuestIsWeekly and QuestIsWeekly())
+    local isMetaQuest = quest.isMeta or false
 
     -- Check C_QuestLog.GetQuestTagInfo for additional data
     local tagInfo = questID and
@@ -121,7 +127,9 @@ function AQG:ClassifyQuest(questID, frequency, isTrivial, isMeta)
         end
     end
 
-    local isTrivialQuest = isTrivial or (C_QuestLog.IsQuestTrivial and C_QuestLog.IsQuestTrivial(questID))
+    local isTrivialQuest = quest.isTrivial
+                          or (C_QuestLog.IsQuestTrivial
+                          and C_QuestLog.IsQuestTrivial(questID))
 
     local isWarboundCompleted = QuestAccountComplete and QuestAccountComplete(questID)
 
@@ -133,36 +141,41 @@ function AQG:DebugQuestAPIs(questID)
     self:Debug("  Raw APIs:")
 
     if QuestIsDaily then
-        self:Debug("    QuestIsDaily() = " .. tostring(QuestIsDaily()))
+        self:Debug("    QuestIsDaily() =",
+                   tostring(QuestIsDaily()))
     end
 
     if QuestIsWeekly then
-        self:Debug("    QuestIsWeekly() = " .. tostring(QuestIsWeekly()))
+        self:Debug("    QuestIsWeekly() =",
+                   tostring(QuestIsWeekly()))
     end
 
     if questID then
         if C_QuestLog.IsQuestTrivial then
-            self:Debug("    IsQuestTrivial = " .. tostring(C_QuestLog.IsQuestTrivial(questID)))
+            self:Debug("    IsQuestTrivial =",
+                       tostring(C_QuestLog.IsQuestTrivial(questID)))
         end
 
         if C_QuestLog.IsQuestFlaggedCompletedOnAccount then
-            self:Debug("    WarboundCompleted = " .. tostring(C_QuestLog.IsQuestFlaggedCompletedOnAccount(questID)))
+            self:Debug("    WarboundCompleted =",
+                       tostring(C_QuestLog.IsQuestFlaggedCompletedOnAccount(questID)))
         end
 
         if C_QuestLog.IsRepeatableQuest then
-            self:Debug("    IsRepeatable = " .. tostring(C_QuestLog.IsRepeatableQuest(questID)))
+            self:Debug("    IsRepeatable =",
+                       tostring(C_QuestLog.IsRepeatableQuest(questID)))
         end
 
         local tagInfo = C_QuestLog.GetQuestTagInfo and C_QuestLog.GetQuestTagInfo(questID)
 
         if tagInfo then
-            self:Debug("    tagID = " .. tostring(tagInfo.tagID))
-            self:Debug("    tagName = " .. tostring(tagInfo.tagName))
-            self:Debug("    worldQuestType = " .. tostring(tagInfo.worldQuestType))
-            local contentKey = CONTENT_TAG_MAP[tagInfo.tagID]
+            self:Debug("    tagID =",          tostring(tagInfo.tagID))
+            self:Debug("    tagName =",        tostring(tagInfo.tagName))
+            self:Debug("    worldQuestType =", tostring(tagInfo.worldQuestType))
 
+            local contentKey = CONTENT_TAG_MAP[tagInfo.tagID]
             if contentKey then
-                self:Debug("    contentFilter = " .. contentKey)
+                self:Debug("    contentFilter =", contentKey)
             end
         else
             self:Debug("    tagInfo = nil")
@@ -218,8 +231,9 @@ function AQG:AreQuestsCached(quests, funcToRetry)
             and not C_QuestLog.GetTitleForQuestID(id) then
 
             if funcToRetry then
-                self:Debug("|cffff4444[!] Quest data not cached,"
-                    .. " retrying...|r")
+                self:Debug("|cffff4444[!] Quest data not cached,",
+                           "retrying...|r")
+
                 C_Timer.After(RETRY_TIME_DELAY, funcToRetry)
             end
 
@@ -275,7 +289,8 @@ end
 
 -- Check if a quest needs currency
 function AQG:QuestItemIsCurrency()
-    local currenciesRequired = GetNumQuestCurrencies and GetNumQuestCurrencies() or 0
+    local currenciesRequired =
+          GetNumQuestCurrencies and GetNumQuestCurrencies() or 0
 
     return currenciesRequired > 0
 end
@@ -299,21 +314,44 @@ function AQG:QuestItemIsReagent()
     return false
 end
 
-function AQG:ShouldAutomate(questID, frequency, isTrivial, isMeta, isAccept)
-    -- Content type filter (dungeon, raid, pvp, etc.)
-    if not self:ShouldAllowContent(questID) then return false end
+function AQG:ShouldAccept(questOrID)
+    local quest = type(questOrID) == "table"
+                  and questOrID or { questID = questOrID }
+
+    if not self:ShouldAllowContent(quest.questID) then return false end
 
     local db = AutoQuestGossipDB
-    local daily, weekly, trivial, warbound, meta = self:ClassifyQuest(questID, frequency, isTrivial, isMeta)
-    local prefix = isAccept and "accept" or "turnIn"
+    local daily, weekly, trivial, warbound, meta =
+          self:ClassifyQuest(quest)
 
-    if meta     then return db[prefix .. "Meta"] end
-    if daily    then return db[prefix .. "Daily"] end
-    if weekly   then return db[prefix .. "Weekly"] end
-    if trivial  then return db[prefix .. "Trivial"] end
-    if warbound then return db[prefix .. "WarboundCompleted"] end
+    -- Return if the user has the quest type automation enabled
+    if meta     then return db.acceptMeta end
+    if daily    then return db.acceptDaily end
+    if weekly   then return db.acceptWeekly end
+    if trivial  then return db.acceptTrivial end
+    if warbound then return db.acceptWarboundCompleted end
 
-    return db[prefix .. "Regular"]
+    return db.acceptRegular
+end
+
+function AQG:ShouldTurnIn(questOrID)
+    local quest = type(questOrID) == "table"
+                  and questOrID or { questID = questOrID }
+
+    if not self:ShouldAllowContent(quest.questID) then return false end
+
+    local db = AutoQuestGossipDB
+    local daily, weekly, trivial, warbound, meta =
+          self:ClassifyQuest(quest)
+
+    -- Return if the user has the quest type automation enabled
+    if meta     then return db.turnInMeta end
+    if daily    then return db.turnInDaily end
+    if weekly   then return db.turnInWeekly end
+    if trivial  then return db.turnInTrivial end
+    if warbound then return db.turnInWarboundCompleted end
+
+    return db.turnInRegular
 end
 
 local function ArgsToString(...)
@@ -332,19 +370,22 @@ function AQG:Warn(...)
         self:PanelPrint("|cffff4444[!] " .. ArgsToString(...) .. "|r")
     end
 
-    print(ADDON_COLOR .. "AQG:|r |cffff4444\124TInterface\\DialogFrame\\UI-Dialog-Icon-AlertNew:0|t", ..., "|r")
+    print(ADDON_COLOR .. "AQG:|r |cffff4444" ..
+          "\124TInterface\\DialogFrame\\UI-Dialog-Icon-AlertNew:0|t", ..., "|r")
 end
 
 -- Verbose: short end-user messages to chat
 function AQG:Verbose(...)
-    if AutoQuestGossipDB.verboseEnabled then
-        print(ADDON_COLOR .. "AQG:|r", ...)
-    end
+    if not AutoQuestGossipDB.verboseEnabled then return end
+
+    print(ADDON_COLOR .. "AQG:|r", ...)
 end
 
 -- Debug: detailed output to panel only, never to chat
 function AQG:Debug(...)
-    if AutoQuestGossipDB.debugEnabled and self.PanelPrint then
+    if not AutoQuestGossipDB.debugEnabled then return end
+
+    if self.PanelPrint then
         self:PanelPrint(ArgsToString(...))
     end
 end
