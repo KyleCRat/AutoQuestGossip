@@ -1,8 +1,8 @@
-## Interface: 120000
+## Interface: 120000, 120001
 ## Title: AutoQuestGossip
 ## Notes: Automates quest accept/turn-in and gossip selection
-## Author: Kyle
-## Version: 1.0.0
+## Author: Yvairel
+## Version: 12.0.1-1
 ## SavedVariables: AutoQuestGossipDB
 
 Core.lua
