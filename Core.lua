@@ -2,7 +2,8 @@ local addonName, AQG = ...
 
 -- Constants
 local ADDON_COLOR = "|cff00ccff"
-local SEPARATOR = ADDON_COLOR .. "--- AQG ----------------------------------------|r"
+local SEPARATOR = ADDON_COLOR ..
+                  "--- AQG ----------------------------------------|r"
 
 local RETRY_TIME_DELAY = .25
 
@@ -79,10 +80,10 @@ local function IsModifierDown()
     return false
 end
 
-function AQG:PausedByModKey()
+function AQG:PausedByModKey(module_name)
     if IsModifierDown() then
-        self:Debug("|cffff4444-> Modifier key held"
-            .. " — automation paused.|r")
+        self:Debug("|cffff4444->", "["..module_name.."] Modifier key held",
+                   " — automation paused.|r")
         return true
     end
 
@@ -96,7 +97,9 @@ function AQG:ClassifyQuest(questID, frequency, isTrivial, isMeta)
     local isMetaQuest = isMeta or false
 
     -- Check C_QuestLog.GetQuestTagInfo for additional data
-    local tagInfo = questID and C_QuestLog.GetQuestTagInfo and C_QuestLog.GetQuestTagInfo(questID)
+    local tagInfo = questID and
+                    C_QuestLog.GetQuestTagInfo and
+                    C_QuestLog.GetQuestTagInfo(questID)
 
     if tagInfo then
         -- worldQuestType indicates world quests which are often dailies
@@ -112,7 +115,8 @@ function AQG:ClassifyQuest(questID, frequency, isTrivial, isMeta)
 
     -- Check repeatable quests via IsRepeatableQuest if available (often daily/weekly)
     if questID and (not isDaily and not isWeekly) then
-        if C_QuestLog.IsRepeatableQuest and C_QuestLog.IsRepeatableQuest(questID) then
+        if C_QuestLog.IsRepeatableQuest and
+           C_QuestLog.IsRepeatableQuest(questID) then
             isDaily = true
         end
     end
@@ -126,48 +130,50 @@ end
 
 function AQG:DebugQuestAPIs(questID)
     if not AutoQuestGossipDB.debugEnabled then return end
-    self:Print("  Raw APIs:")
+    self:Debug("  Raw APIs:")
 
     if QuestIsDaily then
-        self:Print("    QuestIsDaily() = " .. tostring(QuestIsDaily()))
+        self:Debug("    QuestIsDaily() = " .. tostring(QuestIsDaily()))
     end
 
     if QuestIsWeekly then
-        self:Print("    QuestIsWeekly() = " .. tostring(QuestIsWeekly()))
+        self:Debug("    QuestIsWeekly() = " .. tostring(QuestIsWeekly()))
     end
 
     if questID then
         if C_QuestLog.IsQuestTrivial then
-            self:Print("    IsQuestTrivial = " .. tostring(C_QuestLog.IsQuestTrivial(questID)))
+            self:Debug("    IsQuestTrivial = " .. tostring(C_QuestLog.IsQuestTrivial(questID)))
         end
 
         if C_QuestLog.IsQuestFlaggedCompletedOnAccount then
-            self:Print("    WarboundCompleted = " .. tostring(C_QuestLog.IsQuestFlaggedCompletedOnAccount(questID)))
+            self:Debug("    WarboundCompleted = " .. tostring(C_QuestLog.IsQuestFlaggedCompletedOnAccount(questID)))
         end
 
         if C_QuestLog.IsRepeatableQuest then
-            self:Print("    IsRepeatable = " .. tostring(C_QuestLog.IsRepeatableQuest(questID)))
+            self:Debug("    IsRepeatable = " .. tostring(C_QuestLog.IsRepeatableQuest(questID)))
         end
 
         local tagInfo = C_QuestLog.GetQuestTagInfo and C_QuestLog.GetQuestTagInfo(questID)
 
         if tagInfo then
-            self:Print("    tagID = " .. tostring(tagInfo.tagID))
-            self:Print("    tagName = " .. tostring(tagInfo.tagName))
-            self:Print("    worldQuestType = " .. tostring(tagInfo.worldQuestType))
+            self:Debug("    tagID = " .. tostring(tagInfo.tagID))
+            self:Debug("    tagName = " .. tostring(tagInfo.tagName))
+            self:Debug("    worldQuestType = " .. tostring(tagInfo.worldQuestType))
             local contentKey = CONTENT_TAG_MAP[tagInfo.tagID]
 
             if contentKey then
-                self:Print("    contentFilter = " .. contentKey)
+                self:Debug("    contentFilter = " .. contentKey)
             end
         else
-            self:Print("    tagInfo = nil")
+            self:Debug("    tagInfo = nil")
         end
     end
 end
 
 function AQG:GetContentFilterKey(questID)
-    local tagInfo = questID and C_QuestLog.GetQuestTagInfo and C_QuestLog.GetQuestTagInfo(questID)
+    local tagInfo = questID and
+                    C_QuestLog.GetQuestTagInfo and
+                    C_QuestLog.GetQuestTagInfo(questID)
 
     if tagInfo and tagInfo.tagID then
         return CONTENT_TAG_MAP[tagInfo.tagID]
@@ -196,7 +202,7 @@ function AQG:IsQuestDataReady(questID, funcToRetry)
     end
 
     if funcToRetry then
-        self:Print("|cffff4444[!] Quest data not cached,"
+        self:Debug("|cffff4444[!] Quest data not cached,"
             .. " retrying...|r")
         C_Timer.After(RETRY_TIME_DELAY, funcToRetry)
     end
@@ -212,7 +218,7 @@ function AQG:AreQuestsCached(quests, funcToRetry)
             and not C_QuestLog.GetTitleForQuestID(id) then
 
             if funcToRetry then
-                self:Print("|cffff4444[!] Quest data not cached,"
+                self:Debug("|cffff4444[!] Quest data not cached,"
                     .. " retrying...|r")
                 C_Timer.After(RETRY_TIME_DELAY, funcToRetry)
             end
@@ -235,17 +241,21 @@ function AQG:GetNPCID()
 end
 
 function AQG:IsSkipOption(option)
-    return option.name and option.name:lower():find("skip") ~= nil
+    return option.name and
+           option.name:lower():find("skip") ~= nil
 end
 
 function AQG:IsImportantOption(option)
-    return option.name and (option.name:find("<.+>") or option.name:find("|c")) ~= nil
+    return option.name and
+           (option.name:find("<.+>") or option.name:find("|c")) ~= nil
 end
 
 -- Check if any gossip option has dangerous/important text that should pause all automation
 function AQG:GossipHasDangerousOption()
     local options = C_GossipInfo.GetOptions()
+
     if not options then return false, false end
+
     local hasSkip, hasImportant = false, false
 
     for _, option in ipairs(options) do
@@ -297,10 +307,10 @@ function AQG:ShouldAutomate(questID, frequency, isTrivial, isMeta, isAccept)
     local daily, weekly, trivial, warbound, meta = self:ClassifyQuest(questID, frequency, isTrivial, isMeta)
     local prefix = isAccept and "accept" or "turnIn"
 
-    if meta then return db[prefix .. "Meta"] end
-    if daily then return db[prefix .. "Daily"] end
-    if weekly then return db[prefix .. "Weekly"] end
-    if trivial then return db[prefix .. "Trivial"] end
+    if meta     then return db[prefix .. "Meta"] end
+    if daily    then return db[prefix .. "Daily"] end
+    if weekly   then return db[prefix .. "Weekly"] end
+    if trivial  then return db[prefix .. "Trivial"] end
     if warbound then return db[prefix .. "WarboundCompleted"] end
 
     return db[prefix .. "Regular"]
@@ -314,27 +324,6 @@ local function ArgsToString(...)
     end
 
     return table.concat(parts, " ")
-end
-
-local function PanelIsShown()
-    return AQGDebugPanel and AQGDebugPanel:IsShown()
-end
-
---- TODO: Review and re-implement the PRINT, DEBUG, WARN, VERBOSE printers.
---- We need to add proper verbose messages places, as just having "print"
---- is eating messages via the debug panel. We need to specifically put a
---- debug print and a verbose print for each action. While keeping warn for
---- handling situations where more important things are happening.
-
--- Print: detailed debug output to panel (when debug/dev enabled), fallback to chat
-function AQG:Print(...)
-    if AutoQuestGossipDB and AutoQuestGossipDB.debugEnabled and self.PanelPrint then
-        self:PanelPrint(ArgsToString(...))
-
-        if PanelIsShown() then return end
-    end
-
-    print(ADDON_COLOR .. "AQG:|r", ...)
 end
 
 -- Warn: always prints to chat, also to panel if debug enabled
@@ -449,7 +438,7 @@ SlashCmdList["AUTOQUESTGOSSIP"] = function(msg)
     if cmd == "debug" then
         if not AutoQuestGossipDB.debugEnabled then
             AutoQuestGossipDB.debugEnabled = true
-            AQG:Print("Debug mode enabled.")
+            AQG:Debug("Debug mode enabled.")
         end
 
         if AQG.ToggleDetachedPanel then
