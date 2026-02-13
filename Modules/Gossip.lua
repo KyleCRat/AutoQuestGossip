@@ -130,15 +130,13 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     local db      = AutoQuestGossipDB
     local options = C_GossipInfo.GetOptions()
 
-    --- Check for early exit conditions
-
-    -- If we do not have the gossip module enabled, exit
+    -- DO NOTHING: If we do not have the gossip module enabled
     if not db.gossipEnabled then return end
 
-    -- If there are no options for this event, exit
+    -- DO NOTHING: If there are no options for this event
     if not options or #options == 0 then return end
 
-    -- Quest module runs first. If it selected a quest, exit
+    -- DO NOTHING: Quest module runs first. If it selected a quest
     if AQG.questHandled then return end
 
     -- Check if the NPC is offering any quests (active or available).
@@ -195,7 +193,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     --     return
     -- end
 
-    -- If this NPC is on the blocked ID list, exit
+    -- DO NOTHING: If this NPC is on the blocked ID list
     local npcID = AQG:GetNPCID()
     if AQG.BlockedNPCIDs[npcID] then
         AQG:Debug("-> NPC ID", npcID, "is blocked.")
@@ -203,7 +201,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
         return
     end
 
-    -- If this NPC matches a blocked name, exit
+    -- DO NOTHING: If this NPC matches a blocked name
     local npcName = AQG:GetNPCName()
     for _, name in ipairs(AQG.BlockedNPCNames) do
         if npcName:find(name) then
@@ -213,31 +211,36 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
         end
     end
 
-    -- Guard clauses
+    -- DO NOTHING: if a skip option is found
     if hasSkip then
         AQG:Debug("-> Skip option detected. Would NOT auto-select.")
 
         return
     end
 
+    -- DO NOTHING: if an important dialog option is found
     if hasImportant then
         AQG:Debug("-> Important selection detected. Would NOT auto-select.")
 
         return
     end
 
+    -- DO NOTHING: if quests are availble to pickup
+    --   and there are no quests in progress
     if hasAvailableQuests and not hasActiveQuests then
         AQG:Debug("-> NPC has available quests. Would NOT auto-select gossip.")
 
         return
     end
 
+    -- DO NOTHING: if there is a cinematic available
     if hasCinematicOption then
         AQG:Debug("-> NPC has a Cinematic. Would NOT auto-select gossip.")
 
         return
     end
 
+    -- DO NOTHING: if there is a unknown icon
     if hasUnknownIcon then
         AQG:Debug("-> Unknown gossip icon type detected. Would NOT auto-select.")
         AQG:Warn("Unknown gossip type detected — automation paused.")
@@ -245,14 +248,14 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
         return
     end
 
-    -- Pause if the user wants to pause on more than one gossip option
+    -- DO NOTHING: if the user wants to pause on more than one gossip option
     if db.gossipOnlySingle and #options > 1 then
         AQG:Debug("-> Multiple options, single-only mode ON. Would NOT auto-select.")
 
         return
     end
 
-    -- Blizzard-flagged auto select option
+    -- SELECT: Blizzard-flagged auto select option
     if autoSelectOption then
         AQG:Debug("-> Would auto-select Blizzard auto-select gossip:",
             IconTag(autoSelectOption) .. (autoSelectOption.name or "?"),
@@ -263,7 +266,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
         return
     end
 
-    -- Select quest gossip continuation option
+    -- SELECT: Select quest gossip continuation option
     if questOption then
         AQG:Debug("-> Would auto-select Quest gossip:",
             IconTag(questOption) .. (questOption.name or "?"),
@@ -274,7 +277,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
         return
     end
 
-    -- If there is a vendor option, prioritize selecting it
+    -- SELECT: If there is a vendor option, prioritize selecting it
     if vendorOption then
         AQG:Debug("-> Would auto-select vendor option:",
             IconTag(vendorOption) .. (vendorOption.name or "?"),
@@ -285,7 +288,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
         return
     end
 
-    -- Skip NPCs with too many options (guards, dragonriding, etc.)
+    -- DO NOTHING: If NPC has too many options (guards, dragonriding, etc.)
     if #options > MAX_GOSSIP_OPTIONS then
         AQG:Debug("-> NPC has", #options, "gossip options",
             "(>" .. MAX_GOSSIP_OPTIONS .. ").", "Skipping.")
@@ -293,7 +296,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
         return
     end
 
-    -- First valid option
+    -- SELECT: First valid option
     for _, option in ipairs(options) do
         if option.gossipOptionID then
             AQG:Debug("Selecting:", option.gossipOptionID)
