@@ -66,11 +66,11 @@ local function OnGossipShow()
 
             for _, quest in ipairs(activeQuests) do
                 local complete = quest.isComplete and "COMPLETE" or "incomplete"
-                local allowed = quest.isComplete and AQG:ShouldTurnIn(quest)
+                local allowed = quest.isComplete and db.questTurnInEnabled
                 local action = allowed and "-> Would auto turn-in" or ""
 
                 if quest.isComplete and not allowed then
-                    action = "-> Filtered out by settings"
+                    action = "-> auto quest turn in is disabled"
                 end
 
                 if not quest.isComplete then
@@ -88,7 +88,7 @@ local function OnGossipShow()
             for _, quest in ipairs(availableQuests) do
                 local allowed = AQG:ShouldAccept(quest)
                 local action = allowed and " -> Would auto-accept"
-                               or " -> Filtered out by settings"
+                    or " -> Available quest not allowed to be accepted"
 
                 AQG:Debug("  " .. QuestLabel(quest) .. action)
             end
@@ -105,7 +105,7 @@ local function OnGossipShow()
     -- Turn in completed quests
     if db.questTurnInEnabled then
         for _, quest in ipairs(activeQuests) do
-            if quest.isComplete and AQG:ShouldTurnIn(quest) then
+            if quest.isComplete then
                 AQG:Verbose("Turn-in:", QuestLabel(quest))
                 AQG:Debug("Auto turn-in:", QuestLabel(quest))
                 C_GossipInfo.SelectActiveQuest(quest.questID)
@@ -237,7 +237,6 @@ local function OnQuestProgress(questID)
     local completable = IsQuestCompletable()
     local title = QuestTitle()
     local qType = questID and questID ~= 0 and QuestType(questID) or "?"
-    local allowed = questID and questID ~= 0 and AQG:ShouldTurnIn(questID)
     local goldCost = GetQuestMoneyToGet and GetQuestMoneyToGet() or 0
     local requiresCurrency = AQG:QuestItemIsCurrency()
     local requiresReagent, reagentName = AQG:QuestItemIsReagent()
@@ -257,9 +256,7 @@ local function OnQuestProgress(questID)
             AQG:Debug("-> Requires currency. Would NOT advance.")
         elseif requiresReagent then
             AQG:Debug("-> Requires crafting reagent (" .. reagentName .. ").",
-                      "Would NOT advance.")
-        elseif not allowed then
-            AQG:Debug("-> Filtered out by settings. Would NOT advance.")
+                "Would NOT advance.")
         else
             AQG:Debug("-> Would auto-advance to reward step.")
         end
@@ -271,7 +268,6 @@ local function OnQuestProgress(questID)
     if goldCost > 0 then return end
     if requiresCurrency then return end
     if requiresReagent then return end
-    if questID and questID ~= 0 and not allowed then return end
 
     AQG:Verbose("Turn-in:", title,
                 "(ID:", questID or "?", "| Type:", qType .. ")")
@@ -300,7 +296,6 @@ local function OnQuestComplete(questID)
     local title = QuestTitle(questID)
     local qType = questID and questID ~= 0 and QuestType(questID) or "?"
     local numChoices = GetNumQuestChoices()
-    local allowed = not questID or questID == 0 or AQG:ShouldTurnIn(questID)
     local goldCost = GetQuestMoneyToGet and GetQuestMoneyToGet() or 0
 
     if db.debugEnabled then
@@ -309,9 +304,7 @@ local function OnQuestComplete(questID)
         AQG:DebugQuestAPIs(questID)
         AQG:Debug("  Reward choices:", numChoices)
 
-        if not allowed then
-            AQG:Debug("-> Filtered out by settings. Would NOT complete.")
-        elseif goldCost > 0 then
+        if goldCost > 0 then
             AQG:Debug("-> Requires gold",
                       "(" .. GetCoinTextureString(goldCost) .. ").",
                       "Would NOT complete.")
@@ -325,7 +318,6 @@ local function OnQuestComplete(questID)
 
     if db.devMode then return end
 
-    if not allowed then return end
     if goldCost > 0 then return end
     if numChoices <= 1 then
         AQG:Verbose("Complete:", title,
@@ -357,32 +349,24 @@ local function OnQuestAutocomplete(questID)
     if not info or not info.isAutoComplete then return end
 
     if not AQG:IsQuestDataReady(questID, OnQuestAutocomplete) then
-
         return
     end
 
     local title = info.title or QuestTitle(questID)
     local qType = QuestType(questID)
-    local allowed = AQG:ShouldTurnIn(questID)
 
     if db.debugEnabled then
         AQG:DebugSeparator("QUEST_AUTOCOMPLETE")
         AQG:Debug(title, "(ID:", questID or "?", "| Type:", qType .. ")")
-
-        if not allowed then
-            AQG:Debug("-> Filtered out by settings. Would NOT show completion.")
-        else
-            AQG:Debug("-> Would show quest completion dialog.")
-        end
+        AQG:Debug("-> Would show quest completion dialog.")
     end
 
     if db.devMode then return end
-    if not allowed then return end
 
     AQG:Verbose("Auto-complete:", title,
-                "(ID:", questID, "| Type:", qType .. ")")
+        "(ID:", questID, "| Type:", qType .. ")")
     AQG:Debug("Auto-complete (tracker):", title,
-              "(ID:", questID, "| Type:", qType .. ")")
+        "(ID:", questID, "| Type:", qType .. ")")
 
     C_QuestLog.SetSelectedQuest(questID)
     ShowQuestComplete(C_QuestLog.GetSelectedQuest())

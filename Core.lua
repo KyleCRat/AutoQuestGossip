@@ -32,21 +32,15 @@ local CONTENT_TAG_MAP = {
 local defaults = {
     -- Quest settings
     questEnabled = true,
+
+    -- Quest Accept Settings
     questAcceptEnabled = true,
-    questTurnInEnabled = true,
     acceptDaily = true,
     acceptWeekly = true,
     acceptTrivial = false,
     acceptWarboundCompleted = false,
     acceptMeta = false,
     acceptRegular = true,
-    turnInDaily = true,
-    turnInWeekly = true,
-    turnInTrivial = false,
-    turnInWarboundCompleted = false,
-    turnInMeta = false,
-    turnInRegular = true,
-    modifierKey = "SHIFT",
 
     -- Content type filters (all default enabled)
     contentDungeon = true,
@@ -55,6 +49,16 @@ local defaults = {
     contentGroup = true,
     contentDelve = true,
     contentWorldBoss = true,
+
+    -- Quest Turn in Settings
+    questTurnInEnabled = true,
+    -- turnInDaily = true,
+    -- turnInWeekly = true,
+    -- turnInTrivial = false,
+    -- turnInWarboundCompleted = false,
+    -- turnInMeta = false,
+    -- turnInRegular = true,
+    modifierKey = "SHIFT",
 
     -- Gossip settings
     gossipEnabled = true,
@@ -141,29 +145,27 @@ function AQG:DebugQuestAPIs(questID)
     self:Debug("  Raw APIs:")
 
     if QuestIsDaily then
-        self:Debug("    QuestIsDaily() =",
-                   tostring(QuestIsDaily()))
+        self:Debug("    QuestIsDaily() =", tostring(QuestIsDaily()))
     end
 
     if QuestIsWeekly then
-        self:Debug("    QuestIsWeekly() =",
-                   tostring(QuestIsWeekly()))
+        self:Debug("    QuestIsWeekly() =", tostring(QuestIsWeekly()))
     end
 
     if questID then
         if C_QuestLog.IsQuestTrivial then
             self:Debug("    IsQuestTrivial =",
-                       tostring(C_QuestLog.IsQuestTrivial(questID)))
+                tostring(C_QuestLog.IsQuestTrivial(questID)))
         end
 
         if C_QuestLog.IsQuestFlaggedCompletedOnAccount then
             self:Debug("    WarboundCompleted =",
-                       tostring(C_QuestLog.IsQuestFlaggedCompletedOnAccount(questID)))
+                tostring(C_QuestLog.IsQuestFlaggedCompletedOnAccount(questID)))
         end
 
         if C_QuestLog.IsRepeatableQuest then
             self:Debug("    IsRepeatable =",
-                       tostring(C_QuestLog.IsRepeatableQuest(questID)))
+                tostring(C_QuestLog.IsRepeatableQuest(questID)))
         end
 
         local tagInfo = C_QuestLog.GetQuestTagInfo and C_QuestLog.GetQuestTagInfo(questID)
@@ -174,6 +176,7 @@ function AQG:DebugQuestAPIs(questID)
             self:Debug("    worldQuestType =", tostring(tagInfo.worldQuestType))
 
             local contentKey = CONTENT_TAG_MAP[tagInfo.tagID]
+
             if contentKey then
                 self:Debug("    contentFilter =", contentKey)
             end
@@ -185,8 +188,7 @@ end
 
 function AQG:GetContentFilterKey(questID)
     local tagInfo = questID and
-                    C_QuestLog.GetQuestTagInfo and
-                    C_QuestLog.GetQuestTagInfo(questID)
+        C_QuestLog.GetQuestTagInfo and C_QuestLog.GetQuestTagInfo(questID)
 
     if tagInfo and tagInfo.tagID then
         return CONTENT_TAG_MAP[tagInfo.tagID]
@@ -199,6 +201,10 @@ function AQG:ShouldAllowContent(questID)
     local key = self:GetContentFilterKey(questID)
 
     if key then
+        AQG:Debug("Content Type:", key,
+            AutoQuestGossipDB[key] and "Allowed by settings."
+                                   or "Disallowed by settings.")
+
         return AutoQuestGossipDB[key]
     end
 
@@ -336,25 +342,34 @@ function AQG:ShouldAccept(questOrID)
     return db.acceptRegular
 end
 
-function AQG:ShouldTurnIn(questOrID)
-    local quest = type(questOrID) == "table"
-                  and questOrID or { questID = questOrID }
+-- TODO: Remove once confirmed we don't want per-quest-type turn in checks.
+-- 90% sure we can just get rid of this, if we want to auto-turn in quests any
+-- quest we complete we should just turn in. Just becuase it's a dungeon quest
+-- that we don't want to automate, if I manually grab one and I have auto-turn
+-- in enabled. That most likey means I'd want it to auto-turn in not just ignore
+-- it randomly becuase of a content type block or something.
+--
+-- Remove all auto-turn in settings except for the primary turn in true / false
+--
+-- function AQG:ShouldTurnIn(questOrID)
+--     local quest = type(questOrID) == "table"
+--                   and questOrID or { questID = questOrID }
 
-    if not self:ShouldAllowContent(quest.questID) then return false end
+--     if not self:ShouldAllowContent(quest.questID) then return false end
 
-    local db = AutoQuestGossipDB
-    local daily, weekly, trivial, warbound, meta =
-          self:ClassifyQuest(quest)
+--     local db = AutoQuestGossipDB
+--     local daily, weekly, trivial, warbound, meta =
+--           self:ClassifyQuest(quest)
 
-    -- Return if the user has the quest type automation enabled
-    if meta     then return db.turnInMeta end
-    if daily    then return db.turnInDaily end
-    if weekly   then return db.turnInWeekly end
-    if trivial  then return db.turnInTrivial end
-    if warbound then return db.turnInWarboundCompleted end
+--     -- Return if the user has the quest type automation enabled
+--     if meta     then return db.turnInMeta end
+--     if daily    then return db.turnInDaily end
+--     if weekly   then return db.turnInWeekly end
+--     if trivial  then return db.turnInTrivial end
+--     if warbound then return db.turnInWarboundCompleted end
 
-    return db.turnInRegular
-end
+--     return db.turnInRegular
+-- end
 
 local function ArgsToString(...)
     local parts = {}

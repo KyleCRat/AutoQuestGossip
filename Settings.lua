@@ -27,12 +27,12 @@ AQG:OnInit(function()
 
     AddHeader("Auto Turn In")
     AddCheckbox("questTurnInEnabled", "Enable Auto Turn In", "Automatically turn in completed quests")
-    AddCheckbox("turnInDaily", "Daily Quests", "Auto turn-in daily quests")
-    AddCheckbox("turnInWeekly", "Weekly Quests", "Auto turn-in weekly quests")
-    AddCheckbox("turnInTrivial", "Trivial (Low Level) Quests", "Auto turn-in quests that are grey/trivial for your level")
-    AddCheckbox("turnInWarboundCompleted", "Warbound Completed Quests", "Auto turn-in quests already completed on another character")
-    AddCheckbox("turnInMeta", "Meta Quests", "Auto turn-in meta/achievement quests")
-    AddCheckbox("turnInRegular", "Regular Quests", "Auto turn-in standard one-time quests")
+    -- AddCheckbox("turnInDaily", "Daily Quests", "Auto turn-in daily quests")
+    -- AddCheckbox("turnInWeekly", "Weekly Quests", "Auto turn-in weekly quests")
+    -- AddCheckbox("turnInTrivial", "Trivial (Low Level) Quests", "Auto turn-in quests that are grey/trivial for your level")
+    -- AddCheckbox("turnInWarboundCompleted", "Warbound Completed Quests", "Auto turn-in quests already completed on another character")
+    -- AddCheckbox("turnInMeta", "Meta Quests", "Auto turn-in meta/achievement quests")
+    -- AddCheckbox("turnInRegular", "Regular Quests", "Auto turn-in standard one-time quests")
 
     -- Content Type Filters
     AddHeader("Content Type Filters")
