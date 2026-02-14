@@ -3,11 +3,15 @@ local addonName, AQG = ...
 -- Constants
 local ADDON_COLOR = "|cff00ccff"
 local SEPARATOR = ADDON_COLOR ..
-                  "--- AQG ----------------------------------------|r"
+    "--- AQG ----------------------------------------|r"
 
 local RETRY_TIME_DELAY = .25
 
 local QuestAccountComplete = C_QuestLog.IsQuestFlaggedCompletedOnAccount
+local IsRepeatableQuest    = C_QuestLog.IsRepeatableQuest
+local GetQuestTagInfo      = C_QuestLog.GetQuestTagInfo
+local IsQuestTrivial       = C_QuestLog.IsQuestTrivial
+local GetTitleForQuestID   = C_QuestLog.GetTitleForQuestID
 
 local CONTENT_TAG_MAP = {
       [1] = "contentGroup",
@@ -106,10 +110,10 @@ function AQG:ClassifyQuest(questOrID)
                      or (QuestIsWeekly and QuestIsWeekly())
     local isMetaQuest = quest.isMeta or false
 
-    -- Check C_QuestLog.GetQuestTagInfo for additional data
+    -- Check GetQuestTagInfo for additional data
     local tagInfo = questID and
-                    C_QuestLog.GetQuestTagInfo and
-                    C_QuestLog.GetQuestTagInfo(questID)
+                    GetQuestTagInfo and
+                    GetQuestTagInfo(questID)
 
     if tagInfo then
         -- worldQuestType indicates world quests which are often dailies
@@ -125,15 +129,14 @@ function AQG:ClassifyQuest(questOrID)
 
     -- Check repeatable quests via IsRepeatableQuest if available (often daily/weekly)
     if questID and (not isDaily and not isWeekly) then
-        if C_QuestLog.IsRepeatableQuest and
-           C_QuestLog.IsRepeatableQuest(questID) then
+        if IsRepeatableQuest and
+           IsRepeatableQuest(questID) then
             isDaily = true
         end
     end
 
     local isTrivialQuest = quest.isTrivial
-                          or (C_QuestLog.IsQuestTrivial
-                          and C_QuestLog.IsQuestTrivial(questID))
+                          or (IsQuestTrivial and IsQuestTrivial(questID))
 
     local isWarboundCompleted = QuestAccountComplete and QuestAccountComplete(questID)
 
@@ -153,22 +156,22 @@ function AQG:DebugQuestAPIs(questID)
     end
 
     if questID then
-        if C_QuestLog.IsQuestTrivial then
+        if IsQuestTrivial then
             self:Debug("    IsQuestTrivial =",
-                tostring(C_QuestLog.IsQuestTrivial(questID)))
+                tostring(IsQuestTrivial(questID)))
         end
 
-        if C_QuestLog.IsQuestFlaggedCompletedOnAccount then
+        if QuestAccountComplete then
             self:Debug("    WarboundCompleted =",
-                tostring(C_QuestLog.IsQuestFlaggedCompletedOnAccount(questID)))
+                tostring(QuestAccountComplete(questID)))
         end
 
-        if C_QuestLog.IsRepeatableQuest then
+        if IsRepeatableQuest then
             self:Debug("    IsRepeatable =",
-                tostring(C_QuestLog.IsRepeatableQuest(questID)))
+                tostring(IsRepeatableQuest(questID)))
         end
 
-        local tagInfo = C_QuestLog.GetQuestTagInfo and C_QuestLog.GetQuestTagInfo(questID)
+        local tagInfo = GetQuestTagInfo and GetQuestTagInfo(questID)
 
         if tagInfo then
             self:Debug("    tagID =",          tostring(tagInfo.tagID))
@@ -188,7 +191,7 @@ end
 
 function AQG:GetContentFilterKey(questID)
     local tagInfo = questID and
-        C_QuestLog.GetQuestTagInfo and C_QuestLog.GetQuestTagInfo(questID)
+        GetQuestTagInfo and GetQuestTagInfo(questID)
 
     if tagInfo and tagInfo.tagID then
         return CONTENT_TAG_MAP[tagInfo.tagID]
@@ -216,7 +219,7 @@ function AQG:IsQuestDataReady(questID, funcToRetry)
         return true
     end
 
-    if C_QuestLog.GetTitleForQuestID(questID) then
+    if GetTitleForQuestID(questID) then
         return true
     end
 
@@ -236,7 +239,7 @@ function AQG:AreQuestsCached(quests, funcToRetry)
         local id = quest.questID
 
         if id and id ~= 0
-            and not C_QuestLog.GetTitleForQuestID(id) then
+            and not GetTitleForQuestID(id) then
 
             if funcToRetry then
                 self:Debug("|cffff4444[!] Quest data not cached,",

@@ -1,6 +1,9 @@
 local _, AQG = ...
 
-local GetTitle = C_QuestLog.GetTitleForQuestID
+local              GetTitle = C_QuestLog.GetTitleForQuestID
+local               GetInfo = C_QuestLog.GetInfo
+local      SetSelectedQuest = C_QuestLog.SetSelectedQuest
+local GetLogIndexForQuestID = C_QuestLog.GetLogIndexForQuestID
 
 local function QuestType(questOrID)
     local daily, weekly, trivial, warbound, meta =
@@ -342,10 +345,10 @@ local function OnQuestAutocomplete(questID)
     if not db.questTurnInEnabled then return end
     if AQG:PausedByModKey("Quest") then return end
 
-    local index = C_QuestLog.GetLogIndexForQuestID(questID)
+    local index = GetLogIndexForQuestID(questID)
     if not index then return end
 
-    local info = C_QuestLog.GetInfo(index)
+    local info = GetInfo(index)
     if not info or not info.isAutoComplete then return end
 
     if not AQG:IsQuestDataReady(questID, OnQuestAutocomplete) then
@@ -368,8 +371,8 @@ local function OnQuestAutocomplete(questID)
     AQG:Debug("Auto-complete (tracker):", title,
         "(ID:", questID, "| Type:", qType .. ")")
 
-    C_QuestLog.SetSelectedQuest(questID)
-    ShowQuestComplete(C_QuestLog.GetSelectedQuest())
+    SetSelectedQuest(questID)
+    ShowQuestComplete(GetSelectedQuest())
 end
 
 AQG:RegisterEvent("QUEST_AUTOCOMPLETE", OnQuestAutocomplete)

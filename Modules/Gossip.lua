@@ -1,5 +1,10 @@
 local _, AQG = ...
 
+local         GetOptions = C_GossipInfo.GetOptions
+local       SelectOption = C_GossipInfo.SelectOption
+local    GetActiveQuests = C_GossipInfo.GetActiveQuests
+local GetAvailableQuests = C_GossipInfo.GetAvailableQuests
+
 local selectedGossipIDs = {}
 
 -- Gossip icon fileIDs (since Blizzard removed the type field in 10.0)
@@ -121,14 +126,14 @@ local function SelectGossip(option)
         IconTag(option) .. (option.name or "?"),
         "(ID:", option.gossipOptionID .. ")")
 
-    C_GossipInfo.SelectOption(option.gossipOptionID)
+    SelectOption(option.gossipOptionID)
 
     return true
 end
 
 AQG:RegisterEvent("GOSSIP_SHOW", function()
     local db      = AutoQuestGossipDB
-    local options = C_GossipInfo.GetOptions()
+    local options = GetOptions()
 
     -- DO NOTHING: If we do not have the gossip module enabled
     if not db.gossipEnabled then return end
@@ -141,8 +146,8 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
 
     -- Check if the NPC is offering any quests (active or available).
     -- If so, don't auto-select gossip — the player should choose manually.
-    local hasActiveQuests       = #C_GossipInfo.GetActiveQuests() > 0
-    local hasAvailableQuests    = #C_GossipInfo.GetAvailableQuests() > 0
+    local hasActiveQuests       = #GetActiveQuests() > 0
+    local hasAvailableQuests    = #GetAvailableQuests() > 0
 
     -- Check for skip/important text in gossip options
     local hasSkip, hasImportant = AQG:GossipHasDangerousOption()
@@ -180,18 +185,6 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
 
     -- Debug: print gossip option listing
     DebugGossipOptions(options)
-
-    -- If there is only one gossip option and Blizzard has tagged it as an
-    -- auto-select option, let blizzard handle the interaction, exit
-    --
-    -- Sometimes Blizzard does not handle this, no reason not to just handle it
-    -- ourselves
-    --
-    -- if #options == 1 and options[1].selectOptionWhenOnlyOption then
-    --     AQG:Debug("-> Blizzard handling single option.")
-    --
-    --     return
-    -- end
 
     -- DO NOTHING: If this NPC is on the blocked ID list
     local npcID = AQG:GetNPCID()
