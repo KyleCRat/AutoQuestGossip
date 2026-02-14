@@ -277,6 +277,17 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
         return
     end
 
+    -- TODO: Possibly want to avoid gossip if there are active quests?
+    --
+    -- DO NOTHING: if there are active quests at an NPC, and there is no
+    -- auto-select option or quest option, don't do anything
+    -- if hasActiveQuests then
+    --     AQG:Debug("-> NPC has active quests.",
+    --         "Would NOT auto-select vendor or first valid gossip.")
+
+    --     return
+    -- end
+
     -- SELECT: If there is a vendor option, prioritize selecting it
     if vendorOption then
         AQG:Debug("-> Would auto-select vendor option:",
