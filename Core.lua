@@ -333,10 +333,10 @@ function AQG:ShouldAccept(questOrID)
           self:ClassifyQuest(quest)
 
     -- Return if the user has the quest type automation enabled
-    if meta     then return db.acceptMeta end
-    if daily    then return db.acceptDaily end
-    if weekly   then return db.acceptWeekly end
-    if trivial  then return db.acceptTrivial end
+    if     meta then return db.acceptMeta end
+    if    daily then return db.acceptDaily end
+    if   weekly then return db.acceptWeekly end
+    if  trivial then return db.acceptTrivial end
     if warbound then return db.acceptWarboundCompleted end
 
     return db.acceptRegular
