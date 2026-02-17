@@ -248,17 +248,6 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
         return
     end
 
-    -- SELECT: Blizzard-flagged auto select option
-    if autoSelectOption then
-        AQG:Debug("-> Would auto-select Blizzard auto-select gossip:",
-            IconTag(autoSelectOption) .. (autoSelectOption.name or "?"),
-            "(ID:", autoSelectOption.gossipOptionID .. ")")
-
-        SelectGossip(autoSelectOption)
-
-        return
-    end
-
     -- SELECT: Select quest gossip continuation option
     if questOption then
         AQG:Debug("-> Would auto-select Quest gossip:",
@@ -266,6 +255,17 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
             "(ID:", questOption.gossipOptionID .. ")")
 
         SelectGossip(questOption)
+
+        return
+    end
+
+    -- SELECT: Blizzard-flagged auto select option
+    if autoSelectOption then
+        AQG:Debug("-> Would auto-select Blizzard auto-select gossip:",
+            IconTag(autoSelectOption) .. (autoSelectOption.name or "?"),
+            "(ID:", autoSelectOption.gossipOptionID .. ")")
+
+        SelectGossip(autoSelectOption)
 
         return
     end
