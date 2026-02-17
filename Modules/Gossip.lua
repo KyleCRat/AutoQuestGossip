@@ -146,8 +146,8 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
 
     -- Check if the NPC is offering any quests (active or available).
     -- If so, don't auto-select gossip — the player should choose manually.
-    local hasActiveQuests       = #GetActiveQuests() > 0
-    local hasAvailableQuests    = #GetAvailableQuests() > 0
+    local hasActiveQuests    = #GetActiveQuests() > 0
+    local hasAvailableQuests = #GetAvailableQuests() > 0
 
     -- Check for skip/important text in gossip options
     local hasSkip, hasImportant = AQG:GossipHasDangerousOption()
@@ -157,16 +157,16 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     -- Check for unknown (non-gossip, non-vendor) icon types
     local vendorOption
     local autoSelectOption
-    local questOption
     local hasCinematicOption
-    local hasUnknownIcon        = false
+    local questOptions   = {}
+    local hasUnknownIcon = false
 
     for i, option in ipairs(options) do
         hasCinematicOption = IsCinematicOption(option)
 
         if option.gossipOptionID then
-            if not questOption and IsQuestOption(option) then
-                questOption = option
+            if IsQuestOption(option) then
+                table.insert(questOptions, option)
             end
 
             if not vendorOption and IsVendorOption(option) then
@@ -236,7 +236,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     -- DO NOTHING: if there is a unknown icon
     if hasUnknownIcon then
         AQG:Debug("-> Unknown gossip icon type detected. Would NOT auto-select.")
-        AQG:Warn("Unknown gossip type detected — automation paused.")
+        -- AQG:Warn("Unknown gossip type detected — automation paused.")
 
         return
     end
@@ -248,8 +248,18 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
         return
     end
 
+    -- DO NOTHING: if there are multiple quest gossip options
+    if #questOptions > 1 then
+        AQG:Debug("-> Multiple Quest gossip options. Would NOT auto-select.")
+        -- AQG:Warn("Multiple Quest gossip options — automation paused.")
+
+        return
+    end
+
     -- SELECT: Select quest gossip continuation option
-    if questOption then
+    if #questOptions == 1 then
+        local questOption = questOptions[1]
+
         AQG:Debug("-> Would auto-select Quest gossip:",
             IconTag(questOption) .. (questOption.name or "?"),
             "(ID:", questOption.gossipOptionID .. ")")
