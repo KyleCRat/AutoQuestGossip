@@ -48,7 +48,7 @@ scrollFrame:SetPoint("TOPLEFT", panel, "TOPLEFT", PADDING, -(PADDING * 2 + FONT_
 scrollFrame:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -PADDING, PADDING)
 scrollFrame:EnableMouseWheel(true)
 
--- Scroll child
+-- Scroll child — anchored to BOTTOMLEFT so content grows upward
 local scrollChild = CreateFrame("Frame", nil, scrollFrame)
 scrollChild:SetWidth(PANEL_WIDTH - PADDING * 2)
 scrollChild:SetHeight(1) -- grows dynamically
@@ -61,15 +61,15 @@ measure:SetJustifyH("LEFT")
 measure:SetWordWrap(true)
 measure:SetWidth(PANEL_WIDTH - PADDING * 2)
 measure:SetAlpha(0)
-measure:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, 0)
+measure:SetPoint("BOTTOMLEFT", scrollChild, "BOTTOMLEFT", 0, 0)
 
--- Content EditBox (selectable/copyable)
+-- Content EditBox (selectable/copyable) — anchored to bottom
 local content = CreateFrame("EditBox", nil, scrollChild)
 content:SetFont(FONT_PATH, FONT_SIZE, "")
 content:SetTextColor(0.9, 0.9, 0.9, 1)
 content:SetMultiLine(true)
 content:SetAutoFocus(false)
-content:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 0, 0)
+content:SetPoint("BOTTOMLEFT", scrollChild, "BOTTOMLEFT", 0, 0)
 content:SetWidth(PANEL_WIDTH - PADDING * 2)
 content:SetText("")
 content:SetScript("OnEscapePressed", function(self)
@@ -83,19 +83,24 @@ content:SetScript("OnTextChanged", function(self, userInput)
 end)
 
 -- Mouse wheel scrolling
+-- scrollPos 0 = bottom (newest), positive = scrolled up toward older text
 local scrollPos = 0
 
 local function UpdateScroll()
     local contentHeight = scrollChild:GetHeight() or 0
     local viewHeight = scrollFrame:GetHeight() or 0
     local maxScroll = math.max(0, contentHeight - viewHeight)
+
     scrollPos = math.max(0, math.min(scrollPos, maxScroll))
-    scrollFrame:SetVerticalScroll(scrollPos)
+
+    -- Invert: scrollFrame offset 0 = top of content visible,
+    -- we want offset 0 = bottom visible, so offset = maxScroll - scrollPos
+    scrollFrame:SetVerticalScroll(maxScroll - scrollPos)
 end
 
 scrollFrame:SetScript("OnMouseWheel", function(_, delta)
     local step = FONT_SIZE * 3
-    scrollPos = scrollPos - (delta * step)
+    scrollPos = scrollPos + (delta * step) -- scroll up = positive delta = scroll toward older
     UpdateScroll()
 end)
 
@@ -116,11 +121,12 @@ function AQG:PanelPrint(text)
     scrollChild:SetHeight(contentHeight)
     content:SetHeight(contentHeight)
 
-    -- Auto-scroll to bottom (deferred so layout is calculated)
+    -- Stay pinned to bottom unless user has scrolled up
+    if scrollPos <= FONT_SIZE then
+        scrollPos = 0
+    end
+
     C_Timer.After(0, function()
-        local viewHeight = scrollFrame:GetHeight() or 0
-        local totalHeight = scrollChild:GetHeight() or 0
-        scrollPos = math.max(0, totalHeight - viewHeight)
         UpdateScroll()
     end)
 end
