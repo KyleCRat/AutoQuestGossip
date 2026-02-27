@@ -280,7 +280,11 @@ function AQG:IsAngleBracketOption(option)
 end
 
 function AQG:IsStayAwhileOption(option)
-    return option.name and option.name:lower():find("awhile") ~= nil
+    if not self:IsAngleBracketOption(option) then return false end
+
+    local lower = option.name:lower()
+
+    return lower:find("awhile") ~= nil or lower:find("ask ") ~= nil
 end
 
 -- Check if any gossip option has dangerous/important text that should pause all automation

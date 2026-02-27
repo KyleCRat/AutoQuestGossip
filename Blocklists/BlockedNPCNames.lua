@@ -11,5 +11,10 @@ AQG.BlockedNPCNames = {
     "Zidormi",
 
     -- Reason: NPC that handles Mythic Keystone Options. Don't automate.
-    "Lindormi"
+    "Lindormi",
+
+    -- Reason: Should not auto select anything at the delver's supplies, all
+    --   three options are equally used. Even if the supplies' ID changes
+    --   we need to still block so use name.
+    "Delvers' Supplies",
 }

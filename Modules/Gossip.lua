@@ -17,6 +17,17 @@ local SAFE_ICONS = {
     [ICON_GOSSIP] = true,
 }
 
+-- Icons that are known but should never be auto-selected.
+-- Treated as "known" so they don't trigger the unknown-icon guard,
+-- but options with these icons will always be skipped.
+local ICON_BINDER      = 136458 -- BinderGossipIcon (innkeeper hearthstone bind)
+local ICON_FLIGHTMASTER = 132057 -- TaxiGossipIcon (flight master)
+
+local BLOCKED_ICONS = {
+    [ICON_BINDER] = true,
+    [ICON_FLIGHTMASTER] = true,
+}
+
 local MAX_GOSSIP_OPTIONS = 3
 
 local function IsVendorOption(option)
@@ -34,10 +45,16 @@ local function IconTag(option)
     return ""
 end
 
-local function IsSafeIcon(option)
+local function IsKnownIcon(option)
     local icon = option.overrideIconID or option.icon
 
-    return icon and SAFE_ICONS[icon]
+    return icon and (SAFE_ICONS[icon] or BLOCKED_ICONS[icon])
+end
+
+local function IsBlockedIcon(option)
+    local icon = option.overrideIconID or option.icon
+
+    return icon and BLOCKED_ICONS[icon]
 end
 
 local function IsQuestOption(option)
@@ -103,7 +120,9 @@ local function DebugGossipOptions(options)
             tags = tags .. " [VENDOR]"
         end
 
-        if option.gossipOptionID and not IsSafeIcon(option) then
+        if option.gossipOptionID and IsBlockedIcon(option) then
+            tags = tags .. " [BLOCKED ICON]"
+        elseif option.gossipOptionID and not IsKnownIcon(option) then
             tags = tags .. " [UNKNOWN ICON]"
         end
 
@@ -178,7 +197,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
                 hasStayAwhile = true
             end
 
-            if IsQuestOption(option) then
+            if IsQuestOption(option) and not AQG:IsStayAwhileOption(option) then
                 table.insert(questOptions, option)
             end
 
@@ -190,7 +209,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
                 autoSelectOption = option
             end
 
-            if not hasUnknownIcon and not IsSafeIcon(option) then
+            if not hasUnknownIcon and not IsKnownIcon(option) then
                 hasUnknownIcon = true
             end
         end
@@ -342,7 +361,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
 
     -- SELECT: First valid option
     for _, option in ipairs(options) do
-        if option.gossipOptionID then
+        if option.gossipOptionID and not IsBlockedIcon(option) then
             AQG:Debug("Selecting:", option.gossipOptionID)
             SelectGossip(option)
 
