@@ -20,12 +20,14 @@ local SAFE_ICONS = {
 -- Icons that are known but should never be auto-selected.
 -- Treated as "known" so they don't trigger the unknown-icon guard,
 -- but options with these icons will always be skipped.
-local ICON_BINDER      = 136458 -- BinderGossipIcon (innkeeper hearthstone bind)
+local ICON_BINDER       = 136458 -- BinderGossipIcon (innkeeper hearthstone bind)
 local ICON_FLIGHTMASTER = 132057 -- TaxiGossipIcon (flight master)
+local ICON_TRAINER      = 132058 -- TrainerGossipIcon (profession/class trainer)
 
 local BLOCKED_ICONS = {
     [ICON_BINDER] = true,
     [ICON_FLIGHTMASTER] = true,
+    [ICON_TRAINER] = true,
 }
 
 local MAX_GOSSIP_OPTIONS = 3
