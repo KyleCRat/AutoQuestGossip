@@ -28,8 +28,23 @@ local function QuestTitle(questID)
     return GetTitleText() or (questID and GetTitle(questID)) or "?"
 end
 
+local function DebugActiveQuest(quest)
+    local complete = quest.isComplete and "COMPLETE" or "incomplete"
+    local action
+
+    if quest.isComplete then
+        action = AutoQuestGossipDB.questTurnInEnabled
+            and "-> Would auto turn-in"
+            or  "-> auto quest turn in is disabled"
+    else
+        action = "-> Not ready"
+    end
+
+    AQG:Debug("  " .. QuestLabel(quest), "[" .. complete .. "]", action)
+end
+
 --------------------------------------------------------------------------------
---- GOSSIP_SHOW:
+--- GOSSIP_SHOW (quest handling):
 ---
 --- auto-select available and completable quests from the gossip window
 local function OnGossipShow()
@@ -51,7 +66,7 @@ local function OnGossipShow()
         AQG:Warn("Important selections detected — automation paused.")
 
         return
-    elseif hasAngleBracket and AutoQuestGossipDB.pauseOnAngleBracket then
+    elseif hasAngleBracket and db.pauseOnAngleBracket then
         AQG:Warn("Angle bracket option detected — automation paused.")
 
         return
@@ -64,12 +79,10 @@ local function OnGossipShow()
     -- Check for a completable quest before waiting on available quest cache —
     -- turn-ins should proceed regardless of whether accept quests are cached
     local hasCompletable = false
-    if db.questTurnInEnabled then
-        for _, quest in ipairs(activeQuests) do
-            if quest.isComplete then
-                hasCompletable = true
-                break
-            end
+    for _, quest in ipairs(activeQuests) do
+        if quest.isComplete then
+            hasCompletable = true
+            break
         end
     end
 
@@ -84,20 +97,7 @@ local function OnGossipShow()
             AQG:Debug("Active quests (turn-in):")
 
             for _, quest in ipairs(activeQuests) do
-                local complete = quest.isComplete and "COMPLETE" or "incomplete"
-                local allowed = quest.isComplete and db.questTurnInEnabled
-                local action = allowed and "-> Would auto turn-in" or ""
-
-                if quest.isComplete and not allowed then
-                    action = "-> auto quest turn in is disabled"
-                end
-
-                if not quest.isComplete then
-                    action = "-> Not ready"
-                end
-
-                AQG:Debug("  " .. QuestLabel(quest),
-                          "[" .. complete .. "]", action)
+                DebugActiveQuest(quest)
             end
         end
 
@@ -106,8 +106,8 @@ local function OnGossipShow()
 
             for _, quest in ipairs(availableQuests) do
                 local allowed = AQG:ShouldAccept(quest)
-                local action = allowed and " -> Would auto-accept"
-                    or " -> Available quest not allowed to be accepted"
+                local action = allowed and "-> Would auto-accept"
+                    or "-> Available quest not allowed to be accepted"
 
                 AQG:Debug("  " .. QuestLabel(quest) .. action)
             end
@@ -151,6 +151,103 @@ local function OnGossipShow()
 end
 
 AQG:RegisterEvent("GOSSIP_SHOW", OnGossipShow)
+
+--------------------------------------------------------------------------------
+--- QUEST_GREETING:
+---
+--- fires when an NPC has only quests and no gossip options, showing the
+--- QuestGreetingFrame — uses index-based APIs instead of C_GossipInfo
+local function OnQuestGreeting()
+    local db = AutoQuestGossipDB
+
+    if not db.questEnabled then return end
+    if AQG:PausedByModKey("Quest") then return end
+
+    local numActive    = GetNumActiveQuests()
+    local numAvailable = GetNumAvailableQuests()
+
+    if db.debugEnabled then
+        AQG:DebugSeparator("QUEST_GREETING")
+
+        if numActive > 0 then
+            AQG:Debug("Active quests (turn-in):")
+
+            for i = 1, numActive do
+                local title, isComplete = GetActiveTitle(i)
+                local status = isComplete and "COMPLETE" or "incomplete"
+                local action = isComplete and "-> Would auto turn-in" or "-> Not ready"
+                AQG:Debug("  " .. (title or "?"), "[" .. status .. "]", action)
+            end
+        end
+
+        if numAvailable > 0 then
+            AQG:Debug("Available quests (accept):")
+
+            for i = 1, numAvailable do
+                local title = GetAvailableTitle(i)
+                local isTrivial, frequency, _, _, questID = GetAvailableQuestInfo(i)
+                local quest = {
+                    questID   = questID,
+                    isTrivial = isTrivial,
+                    frequency = frequency,
+                }
+                local allowed = AQG:ShouldAccept(quest)
+                local action = allowed and "-> Would auto-accept"
+                    or "-> Available quest not allowed to be accepted"
+
+                AQG:Debug("  " .. (title or "?")
+                    .. " (ID: " .. (questID or "?") .. ")", action)
+            end
+        end
+
+        if numActive == 0 and numAvailable == 0 then
+            AQG:Debug("No quests at this NPC.")
+        end
+    end
+
+    -- Dev mode: block automation after printing
+    if db.devMode then return end
+
+    -- Turn in completed quests
+    if db.questTurnInEnabled then
+        for i = 1, numActive do
+            local title, isComplete = GetActiveTitle(i)
+
+            if isComplete then
+                AQG:Verbose("Turn-in:", title or "?")
+                AQG:Debug("Auto turn-in:", title or "?")
+                SelectActiveQuest(i)
+
+                return
+            end
+        end
+    end
+
+    -- Accept available quests
+    if db.questAcceptEnabled then
+        for i = 1, numAvailable do
+            local title = GetAvailableTitle(i)
+            local isTrivial, frequency, _, _, questID = GetAvailableQuestInfo(i)
+            local quest = {
+                questID   = questID,
+                isTrivial = isTrivial,
+                frequency = frequency,
+            }
+
+            if AQG:ShouldAccept(quest) then
+                AQG:Verbose("Accept:", title or "?",
+                    "(ID:", questID or "?", ")")
+                AQG:Debug("Auto-accept:", title or "?",
+                    "(ID:", questID or "?", ")")
+                SelectAvailableQuest(i)
+
+                return
+            end
+        end
+    end
+end
+
+AQG:RegisterEvent("QUEST_GREETING", OnQuestGreeting)
 
 --------------------------------------------------------------------------------
 --- QUEST_ACCEPT_CONFIRM:
