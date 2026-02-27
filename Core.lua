@@ -284,7 +284,7 @@ function AQG:IsStayAwhileOption(option)
 
     local lower = option.name:lower()
 
-    return lower:find("awhile") ~= nil or lower:find("ask ") ~= nil
+    return lower:find("awhile") ~= nil -- or lower:find("ask ") ~= nil
 end
 
 -- Check if any gossip option has dangerous/important text that should pause all automation

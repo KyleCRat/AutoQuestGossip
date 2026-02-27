@@ -207,7 +207,8 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
                 vendorOption = option
             end
 
-            if not autoSelectOption and option.selectOptionWhenOnlyOption then
+            if not autoSelectOption and option.selectOptionWhenOnlyOption
+                and not IsBlockedIcon(option) then
                 autoSelectOption = option
             end
 
