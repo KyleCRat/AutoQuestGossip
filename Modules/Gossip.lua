@@ -95,6 +95,10 @@ local function DebugGossipOptions(options)
             tags = tags .. " [ANGLE-BRACKET]"
         end
 
+        if AQG:IsStayAwhileOption(option) then
+            tags = tags .. " [STAY-AWHILE]"
+        end
+
         if IsVendorOption(option) then
             tags = tags .. " [VENDOR]"
         end
@@ -162,6 +166,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     local vendorOption
     local autoSelectOption
     local hasCinematicOption
+    local hasStayAwhile  = false
     local questOptions   = {}
     local hasUnknownIcon = false
 
@@ -169,6 +174,10 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
         hasCinematicOption = IsCinematicOption(option)
 
         if option.gossipOptionID then
+            if AQG:IsStayAwhileOption(option) then
+                hasStayAwhile = true
+            end
+
             if IsQuestOption(option) then
                 table.insert(questOptions, option)
             end
@@ -287,6 +296,15 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
             "(ID:", autoSelectOption.gossipOptionID .. ")")
 
         SelectGossip(autoSelectOption)
+
+        return
+    end
+
+    -- DO NOTHING: if a Stay Awhile option is present — quest and auto-select
+    -- options above are still allowed, but vendor/fallback selection should not
+    -- override a story prompt the player may want to click
+    if hasStayAwhile then
+        AQG:Debug("-> Stay Awhile option detected. Would NOT auto-select vendor or fallback.")
 
         return
     end

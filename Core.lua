@@ -279,6 +279,10 @@ function AQG:IsAngleBracketOption(option)
     return option.name and option.name:find("<.+>") ~= nil
 end
 
+function AQG:IsStayAwhileOption(option)
+    return option.name and option.name:lower():find("awhile") ~= nil
+end
+
 -- Check if any gossip option has dangerous/important text that should pause all automation
 function AQG:GossipHasDangerousOption()
     local options = C_GossipInfo.GetOptions()

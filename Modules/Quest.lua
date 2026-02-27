@@ -61,8 +61,20 @@ local function OnGossipShow()
     local activeQuests = C_GossipInfo.GetActiveQuests()
     if not AQG:AreQuestsCached(activeQuests, OnGossipShow) then return end
 
+    -- Check for a completable quest before waiting on available quest cache —
+    -- turn-ins should proceed regardless of whether accept quests are cached
+    local hasCompletable = false
+    if db.questTurnInEnabled then
+        for _, quest in ipairs(activeQuests) do
+            if quest.isComplete then
+                hasCompletable = true
+                break
+            end
+        end
+    end
+
     local availableQuests = C_GossipInfo.GetAvailableQuests()
-    if not AQG:AreQuestsCached(availableQuests, OnGossipShow) then return end
+    if not hasCompletable and not AQG:AreQuestsCached(availableQuests, OnGossipShow) then return end
 
     -- Debug: print detailed info to debug panel
     if db.debugEnabled then
