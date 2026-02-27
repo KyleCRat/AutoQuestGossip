@@ -305,6 +305,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     -- override a story prompt the player may want to click
     if hasStayAwhile then
         AQG:Debug("-> Stay Awhile option detected. Would NOT auto-select vendor or fallback.")
+        AQG:Warn("Stay Awhile option detected — gossip paused.")
 
         return
     end
