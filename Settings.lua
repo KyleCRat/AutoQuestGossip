@@ -67,6 +67,9 @@ AQG:OnInit(function()
     AddCheckbox("gossipOnlySingle", "Only Auto-Select Single Option",
         "When enabled, gossip will only be auto-selected if there is exactly one option. " ..
         "If there are multiple options, you choose manually.")
+    AddCheckbox("pauseOnAngleBracket", "Pause on Bracket <Option>",
+        "Pause automation when a gossip option contains angle bracket text (e.g. <Do something>). " ..
+        "These often indicate player choices that may have consequences.")
 
     -- Output Modes
     AddHeader("Output Modes")

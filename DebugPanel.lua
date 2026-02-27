@@ -86,7 +86,7 @@ end)
 local scrollPos = 0
 
 local function UpdateScroll()
-    local contentHeight = measure:GetStringHeight() or 0
+    local contentHeight = scrollChild:GetHeight() or 0
     local viewHeight = scrollFrame:GetHeight() or 0
     local maxScroll = math.max(0, contentHeight - viewHeight)
     scrollPos = math.max(0, math.min(scrollPos, maxScroll))
@@ -119,7 +119,7 @@ function AQG:PanelPrint(text)
     -- Auto-scroll to bottom (deferred so layout is calculated)
     C_Timer.After(0, function()
         local viewHeight = scrollFrame:GetHeight() or 0
-        local totalHeight = measure:GetStringHeight() or 0
+        local totalHeight = scrollChild:GetHeight() or 0
         scrollPos = math.max(0, totalHeight - viewHeight)
         UpdateScroll()
     end)

@@ -91,6 +91,10 @@ local function DebugGossipOptions(options)
             tags = tags .. " [IMPORTANT]"
         end
 
+        if AQG:IsAngleBracketOption(option) then
+            tags = tags .. " [ANGLE-BRACKET]"
+        end
+
         if IsVendorOption(option) then
             tags = tags .. " [VENDOR]"
         end
@@ -150,7 +154,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     local hasAvailableQuests = #GetAvailableQuests() > 0
 
     -- Check for skip/important text in gossip options
-    local hasSkip, hasImportant = AQG:GossipHasDangerousOption()
+    local hasSkip, hasImportant, hasAngleBracket = AQG:GossipHasDangerousOption()
 
     -- Find vendor option
     -- auto-select flagged option
@@ -214,6 +218,13 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     -- DO NOTHING: if an important dialog option is found
     if hasImportant then
         AQG:Debug("-> Important selection detected. Would NOT auto-select.")
+
+        return
+    end
+
+    -- DO NOTHING: if an angle bracket option is found and setting is enabled
+    if hasAngleBracket and db.pauseOnAngleBracket then
+        AQG:Debug("-> Angle bracket option detected. Would NOT auto-select.")
 
         return
     end

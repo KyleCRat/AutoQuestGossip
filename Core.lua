@@ -67,6 +67,7 @@ local defaults = {
     -- Gossip settings
     gossipEnabled = true,
     gossipOnlySingle = true,
+    pauseOnAngleBracket = true,
 
     -- Output modes
     verboseEnabled = false,
@@ -271,17 +272,20 @@ function AQG:IsSkipOption(option)
 end
 
 function AQG:IsImportantOption(option)
-    return option.name and
-           (option.name:find("<.+>") or option.name:find("|c")) ~= nil
+    return option.name and option.name:find("|c") ~= nil
+end
+
+function AQG:IsAngleBracketOption(option)
+    return option.name and option.name:find("<.+>") ~= nil
 end
 
 -- Check if any gossip option has dangerous/important text that should pause all automation
 function AQG:GossipHasDangerousOption()
     local options = C_GossipInfo.GetOptions()
 
-    if not options then return false, false end
+    if not options then return false, false, false end
 
-    local hasSkip, hasImportant = false, false
+    local hasSkip, hasImportant, hasAngleBracket = false, false, false
 
     for _, option in ipairs(options) do
         if not hasSkip and self:IsSkipOption(option) then
@@ -292,10 +296,14 @@ function AQG:GossipHasDangerousOption()
             hasImportant = true
         end
 
-        if hasSkip and hasImportant then break end
+        if not hasAngleBracket and self:IsAngleBracketOption(option) then
+            hasAngleBracket = true
+        end
+
+        if hasSkip and hasImportant and hasAngleBracket then break end
     end
 
-    return hasSkip, hasImportant
+    return hasSkip, hasImportant, hasAngleBracket
 end
 
 -- Check if a quest needs currency

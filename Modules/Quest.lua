@@ -41,7 +41,7 @@ local function OnGossipShow()
 
     -- If any gossip option has skip/important text,
     -- pause ALL automation (quest + gossip)
-    local hasSkip, hasImportant = AQG:GossipHasDangerousOption()
+    local hasSkip, hasImportant, hasAngleBracket = AQG:GossipHasDangerousOption()
 
     if hasSkip then
         AQG:Warn("Skip option detected — automation paused.")
@@ -49,6 +49,10 @@ local function OnGossipShow()
         return
     elseif hasImportant then
         AQG:Warn("Important selections detected — automation paused.")
+
+        return
+    elseif hasAngleBracket and AutoQuestGossipDB.pauseOnAngleBracket then
+        AQG:Warn("Angle bracket option detected — automation paused.")
 
         return
     end
