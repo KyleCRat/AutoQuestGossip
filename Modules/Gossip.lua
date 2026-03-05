@@ -110,6 +110,10 @@ local function DebugGossipOptions(options)
             tags = tags .. " [IMPORTANT]"
         end
 
+        if AQG:IsDelveOption(option) then
+            tags = tags .. " [DELVE]"
+        end
+
         if AQG:IsAngleBracketOption(option) then
             tags = tags .. " [ANGLE-BRACKET]"
         end
@@ -178,25 +182,39 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     local hasActiveQuests    = #GetActiveQuests() > 0
     local hasAvailableQuests = #GetAvailableQuests() > 0
 
-    -- Check for skip/important text in gossip options
-    local hasSkip, hasImportant, hasAngleBracket = AQG:GossipHasDangerousOption()
-
-    -- Find vendor option
-    -- auto-select flagged option
-    -- Check for unknown (non-gossip, non-vendor) icon types
     local vendorOption
     local autoSelectOption
     local hasCinematicOption
-    local hasStayAwhile  = false
-    local questOptions   = {}
-    local hasUnknownIcon = false
+    local hasSkip         = false
+    local hasImportant    = false
+    local hasAngleBracket = false
+    local hasStayAwhile   = false
+    local hasDelve        = false
+    local hasUnknownIcon  = false
+    local questOptions    = {}
 
     for i, option in ipairs(options) do
         hasCinematicOption = IsCinematicOption(option)
 
+        if not hasSkip and AQG:IsSkipOption(option) then
+            hasSkip = true
+        end
+
+        if not hasImportant and AQG:IsImportantOption(option) then
+            hasImportant = true
+        end
+
+        if not hasAngleBracket and AQG:IsAngleBracketOption(option) then
+            hasAngleBracket = true
+        end
+
         if option.gossipOptionID then
             if AQG:IsStayAwhileOption(option) then
                 hasStayAwhile = true
+            end
+
+            if not hasDelve and AQG:IsDelveOption(option) then
+                hasDelve = true
             end
 
             if IsQuestOption(option) and not AQG:IsStayAwhileOption(option) then
@@ -247,7 +265,8 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     end
 
     -- DO NOTHING: if an important dialog option is found
-    if hasImportant then
+    --    unless: it is a delve option, that is safe to automate
+    if hasImportant and not hasDelve then
         AQG:Debug("-> Important selection detected. Would NOT auto-select.")
 
         return

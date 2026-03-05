@@ -56,20 +56,24 @@ local function OnGossipShow()
 
     -- If any gossip option has skip/important text,
     -- pause ALL automation (quest + gossip)
-    local hasSkip, hasImportant, hasAngleBracket = AQG:GossipHasDangerousOption()
+    for _, option in ipairs(C_GossipInfo.GetOptions() or {}) do
+        if AQG:IsSkipOption(option) then
+            AQG:Warn("Skip option detected — automation paused.")
 
-    if hasSkip then
-        AQG:Warn("Skip option detected — automation paused.")
+            return
+        end
 
-        return
-    elseif hasImportant then
-        AQG:Warn("Important selections detected — automation paused.")
+        if AQG:IsImportantOption(option) then
+            AQG:Warn("Important selections detected — automation paused.")
 
-        return
-    elseif hasAngleBracket and db.pauseOnAngleBracket then
-        AQG:Warn("Angle bracket option detected — automation paused.")
+            return
+        end
 
-        return
+        if AQG:IsAngleBracketOption(option) and db.pauseOnAngleBracket then
+            AQG:Warn("Angle bracket option detected — automation paused.")
+
+            return
+        end
     end
 
     -- Wait for quest data if not yet cached
@@ -349,6 +353,7 @@ local function OnQuestProgress(questID)
     questID = questID or GetQuestID()
 
     if not AQG:IsQuestDataReady(questID, OnQuestProgress) then return end
+    if not AQG:ShouldTurnIn(questID) then return end
 
     local completable = IsQuestCompletable()
     local title = QuestTitle()
@@ -408,6 +413,7 @@ local function OnQuestComplete(questID)
     questID = questID or GetQuestID()
 
     if not AQG:IsQuestDataReady(questID, OnQuestComplete) then return end
+    if not AQG:ShouldTurnIn(questID) then return end
 
     local title = QuestTitle(questID)
     local qType = questID and questID ~= 0 and QuestType(questID) or "?"

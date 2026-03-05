@@ -279,39 +279,16 @@ function AQG:IsAngleBracketOption(option)
     return option.name and option.name:find("<.+>") ~= nil
 end
 
+function AQG:IsDelveOption(option)
+    return option.name and option.name:find("%(Delve%)") ~= nil
+end
+
 function AQG:IsStayAwhileOption(option)
     if not self:IsAngleBracketOption(option) then return false end
 
     local lower = option.name:lower()
 
     return lower:find("awhile") ~= nil -- or lower:find("ask ") ~= nil
-end
-
--- Check if any gossip option has dangerous/important text that should pause all automation
-function AQG:GossipHasDangerousOption()
-    local options = C_GossipInfo.GetOptions()
-
-    if not options then return false, false, false end
-
-    local hasSkip, hasImportant, hasAngleBracket = false, false, false
-
-    for _, option in ipairs(options) do
-        if not hasSkip and self:IsSkipOption(option) then
-            hasSkip = true
-        end
-
-        if not hasImportant and self:IsImportantOption(option) then
-            hasImportant = true
-        end
-
-        if not hasAngleBracket and self:IsAngleBracketOption(option) then
-            hasAngleBracket = true
-        end
-
-        if hasSkip and hasImportant and hasAngleBracket then break end
-    end
-
-    return hasSkip, hasImportant, hasAngleBracket
 end
 
 -- Check if a quest needs currency
@@ -361,34 +338,17 @@ function AQG:ShouldAccept(questOrID)
     return db.acceptRegular
 end
 
--- TODO: Remove once confirmed we don't want per-quest-type turn in checks.
--- 90% sure we can just get rid of this, if we want to auto-turn in quests any
--- quest we complete we should just turn in. Just becuase it's a dungeon quest
--- that we don't want to automate, if I manually grab one and I have auto-turn
--- in enabled. That most likey means I'd want it to auto-turn in not just ignore
--- it randomly becuase of a content type block or something.
---
 -- Remove all auto-turn in settings except for the primary turn in true / false
 --
--- function AQG:ShouldTurnIn(questOrID)
---     local quest = type(questOrID) == "table"
---                   and questOrID or { questID = questOrID }
+function AQG:ShouldTurnIn(questOrID)
+    local quest = type(questOrID) == "table"
+                  and questOrID or { questID = questOrID }
 
---     if not self:ShouldAllowContent(quest.questID) then return false end
+    local title = GetTitleForQuestID(quest.questID)
+    if title and title:find("Delver's Call:", 1, true) then return false end
 
---     local db = AutoQuestGossipDB
---     local daily, weekly, trivial, warbound, meta =
---           self:ClassifyQuest(quest)
-
---     -- Return if the user has the quest type automation enabled
---     if meta     then return db.turnInMeta end
---     if daily    then return db.turnInDaily end
---     if weekly   then return db.turnInWeekly end
---     if trivial  then return db.turnInTrivial end
---     if warbound then return db.turnInWarboundCompleted end
-
---     return db.turnInRegular
--- end
+    return true
+end
 
 local function ArgsToString(...)
     local parts = {}
