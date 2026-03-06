@@ -18,4 +18,9 @@ AQG.BlockedNPCIDs = {
     [240835] = true,
     -- Vyrin the Supplier
     [240837] = true,
+
+
+    ----------------------------------------------------------------------------
+    -- Prey - Astalor Bloodsworn
+    [246231] = true,
 }
