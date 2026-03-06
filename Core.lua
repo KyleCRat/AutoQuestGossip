@@ -56,6 +56,7 @@ local defaults = {
 
     -- Quest Turn in Settings
     questTurnInEnabled = true,
+    questTurnInDelve = false,
     -- turnInDaily = true,
     -- turnInWeekly = true,
     -- turnInTrivial = false,
@@ -263,7 +264,7 @@ end
 function AQG:GetNPCID()
     local guid = UnitGUID("npc")
 
-    return guid and select(6, strsplit("-", guid)) or "?"
+    return guid and tonumber((select(6, strsplit("-", guid)))) or "?"
 end
 
 function AQG:IsSkipOption(option)
@@ -345,7 +346,9 @@ function AQG:ShouldTurnIn(questOrID)
                   and questOrID or { questID = questOrID }
 
     local title = GetTitleForQuestID(quest.questID)
-    if title and title:find("Delver's Call:", 1, true) then return false end
+    if title and title:find("Delver's Call:", 1, true) then
+        return AutoQuestGossipDB.questTurnInDelve
+    end
 
     return true
 end

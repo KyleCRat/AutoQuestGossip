@@ -32,12 +32,14 @@ local function DebugActiveQuest(quest)
     local complete = quest.isComplete and "COMPLETE" or "incomplete"
     local action
 
-    if quest.isComplete then
-        action = AutoQuestGossipDB.questTurnInEnabled
-            and "-> Would auto turn-in"
-            or  "-> auto quest turn in is disabled"
-    else
+    if not quest.isComplete then
         action = "-> Not ready"
+    elseif not AutoQuestGossipDB.questTurnInEnabled then
+        action = "-> auto quest turn in is disabled"
+    elseif not AQG:ShouldTurnIn(quest) then
+        action = "-> Blocked by turn-in filter"
+    else
+        action = "-> Would auto turn-in"
     end
 
     AQG:Debug("  " .. QuestLabel(quest), "[" .. complete .. "]", action)
@@ -491,7 +493,7 @@ local function OnQuestAutocomplete(questID)
         "(ID:", questID, "| Type:", qType .. ")")
 
     SetSelectedQuest(questID)
-    ShowQuestComplete(GetSelectedQuest())
+    ShowQuestComplete(questID)
 end
 
 AQG:RegisterEvent("QUEST_AUTOCOMPLETE", OnQuestAutocomplete)

@@ -27,6 +27,7 @@ AQG:OnInit(function()
 
     AddHeader("Auto Turn In")
     AddCheckbox("questTurnInEnabled", "Enable Auto Turn In", "Automatically turn in completed quests")
+    AddCheckbox("questTurnInDelve", "Completed Delve Quests", "Automatically turn in completed Delve Quests")
     -- AddCheckbox("turnInDaily", "Daily Quests", "Auto turn-in daily quests")
     -- AddCheckbox("turnInWeekly", "Weekly Quests", "Auto turn-in weekly quests")
     -- AddCheckbox("turnInTrivial", "Trivial (Low Level) Quests", "Auto turn-in quests that are grey/trivial for your level")
