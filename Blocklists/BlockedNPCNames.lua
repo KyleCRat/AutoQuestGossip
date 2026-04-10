@@ -17,4 +17,8 @@ AQG.BlockedNPCNames = {
     --   three options are equally used. Even if the supplies' ID changes
     --   we need to still block so use name.
     "Delvers' Supplies",
+
+    -- Reason: Do not automate anything that is meant to be used to teleport
+    --   between locations.
+    "Teleport Pad",
 }

@@ -9,6 +9,7 @@ AQG.BlockedNPCIDs = {
     ----------------------------------------------------------------------------
     -- Saltheril's Soiree NPC's
     -- (Eversong Woods, Fairbreeze Village)
+    -- Don't autoselect token options
     --
     -- Ranger-Captain Dawnfletch
     [240836] = true,
@@ -19,8 +20,8 @@ AQG.BlockedNPCIDs = {
     -- Vyrin the Supplier
     [240837] = true,
 
-
     ----------------------------------------------------------------------------
     -- Prey - Astalor Bloodsworn
+    -- Do not try to autoselet prey
     [246231] = true,
 }
