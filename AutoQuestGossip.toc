@@ -2,7 +2,7 @@
 ## Title: AutoQuestGossip
 ## Notes: Automates quest accept/turn-in and gossip selection
 ## Author: Yvairel
-## Version: 12.0.1-1
+## Version: 12.0.5-1
 ## SavedVariables: AutoQuestGossipDB
 
 Core.lua
