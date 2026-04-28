@@ -263,8 +263,9 @@ end
 
 function AQG:GetNPCID()
     local guid = UnitGUID("npc")
+    if not guid or issecretvalue(guid) then return "?" end
 
-    return guid and tonumber((select(6, strsplit("-", guid)))) or "?"
+    return tonumber((select(6, strsplit("-", guid)))) or "?"
 end
 
 function AQG:IsSkipOption(option)
