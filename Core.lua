@@ -258,7 +258,10 @@ function AQG:AreQuestsCached(quests, funcToRetry)
 end
 
 function AQG:GetNPCName()
-    return UnitName("npc") or "?"
+    local name = UnitName("npc")
+    if not name or issecretvalue(name) then return "?" end
+
+    return name
 end
 
 function AQG:GetNPCID()
