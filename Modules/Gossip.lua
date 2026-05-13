@@ -177,6 +177,9 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     -- DO NOTHING: Quest module runs first. If it selected a quest
     if AQG.questHandled then return end
 
+    -- DO NOTHING: If the NPC identity is secret (protected by Blizzard)
+    if AQG:IsNPCSecret() then return end
+
     -- Check if the NPC is offering any quests (active or available).
     -- If so, don't auto-select gossip — the player should choose manually.
     local hasActiveQuests    = #GetActiveQuests() > 0

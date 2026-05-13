@@ -54,6 +54,7 @@ local function OnGossipShow()
     local db = AutoQuestGossipDB
 
     if not db.questEnabled then return end
+    if AQG:IsNPCSecret() then return end
     if AQG:PausedByModKey("Quest") then return end
 
     -- If any gossip option has skip/important text,
@@ -167,6 +168,7 @@ local function OnQuestGreeting()
     local db = AutoQuestGossipDB
 
     if not db.questEnabled then return end
+    if AQG:IsNPCSecret() then return end
     if AQG:PausedByModKey("Quest") then return end
 
     local numActive    = GetNumActiveQuests()
@@ -297,6 +299,7 @@ local function OnQuestDetail(questID)
 
     if not db.questEnabled then return end
     if not db.questAcceptEnabled then return end
+    if AQG:IsNPCSecret() then return end
     if AQG:PausedByModKey("Quest") then return end
 
     questID = questID or GetQuestID()
@@ -350,6 +353,7 @@ local function OnQuestProgress(questID)
 
     if not db.questEnabled then return end
     if not db.questTurnInEnabled then return end
+    if AQG:IsNPCSecret() then return end
     if AQG:PausedByModKey("Quest") then return end
 
     questID = questID or GetQuestID()
@@ -410,6 +414,7 @@ local function OnQuestComplete(questID)
 
     if not db.questEnabled then return end
     if not db.questTurnInEnabled then return end
+    if AQG:IsNPCSecret() then return end
     if AQG:PausedByModKey("Quest") then return end
 
     questID = questID or GetQuestID()
