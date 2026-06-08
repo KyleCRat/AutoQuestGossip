@@ -257,26 +257,6 @@ function AQG:AreQuestsCached(quests, funcToRetry)
     return true
 end
 
-function AQG:IsNPCSecret()
-    local guid = UnitGUID("npc")
-
-    return not guid or issecretvalue(guid)
-end
-
-function AQG:GetNPCName()
-    local name = UnitName("npc")
-    if not name or issecretvalue(name) then return "?" end
-
-    return name
-end
-
-function AQG:GetNPCID()
-    local guid = UnitGUID("npc")
-    if not guid or issecretvalue(guid) then return "?" end
-
-    return tonumber((select(6, strsplit("-", guid)))) or "?"
-end
-
 function AQG:IsSkipOption(option)
     return option.name and
            option.name:lower():find("skip") ~= nil
