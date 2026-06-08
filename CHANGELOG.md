@@ -1,5 +1,8 @@
 # Changelog
 
+## [12.0.7-2] - 2026-06-08
+- Bump to game version 12.0.7
+
 ## [12.0.5-1] - 2026-04-20
 - Automate quest accept/turn-in from gossip, quest detail, quest progress, quest complete, and quest autocomplete events
 - Automate gossip option selection with icon-based filtering and priority chain (quest > auto-select > vendor > first valid)
