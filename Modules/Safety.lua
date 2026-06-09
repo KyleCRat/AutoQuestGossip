@@ -408,7 +408,7 @@ function Safety:ValidateCurrentQuest(questID, frameName)
         end
 
         if currentQuestID == 0 then
-            return true
+            return false, "current quest is unavailable"
         end
 
         if currentQuestID ~= questID then

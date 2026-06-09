@@ -16,7 +16,7 @@ local GetLogIndexForQuestID = C_QuestLog.GetLogIndexForQuestID
 
 local function DebugQuestDecisionDetails(decision)
     if decision and Decisions:IsSafeQuestID(decision.targetID) then
-        AQG:DebugQuestAPIs(decision.targetID)
+        Decisions:DebugQuestAPIs(decision.targetID)
     end
 end
 
@@ -56,6 +56,45 @@ end
 
 local function DebugExecution(decision)
     Safety:DebugDecisionExecution("Quest", decision, QuestLabel(decision))
+end
+
+local function SameQuestDecision(expected, current)
+    if not expected or not current then return false end
+    if expected.action ~= current.action then return false end
+
+    return Safety:IsSafeNumber(expected.targetID) and
+        Safety:IsSafeNumber(current.targetID) and
+        expected.targetID == current.targetID
+end
+
+local function RevalidateDecision(decision, decideFunc)
+    local currentDecision = decideFunc()
+
+    if not currentDecision or not currentDecision.allowed then
+        return nil, currentDecision and currentDecision.reason
+            or "quest decision is no longer allowed"
+    end
+
+    if not SameQuestDecision(decision, currentDecision) then
+        return nil, "quest decision changed"
+    end
+
+    return currentDecision, nil
+end
+
+local function RevalidateForAction(decision, decideFunc)
+    local currentDecision, reason = RevalidateDecision(decision, decideFunc)
+
+    if not currentDecision then
+        DebugRevalidationFailed(reason)
+        return nil
+    end
+
+    if not CanExecuteDecision(currentDecision) then
+        return nil
+    end
+
+    return currentDecision
 end
 
 local function MakeGossipQuestResult(decision, executed, pending)
@@ -167,6 +206,14 @@ local function ExecuteGossipQuestDecision(decision)
         return false
     end
 
+    decision = RevalidateForAction(decision, function()
+        local context = AQG.InteractionContext:Build("GOSSIP_QUEST_REVALIDATE")
+        return Decisions:DecideGossipQuestAction(context)
+    end)
+    if not decision then
+        return false
+    end
+
     if decision.action == ACTIONS.GOSSIP_TURN_IN then
         local currentQuest, reason =
             FindCurrentGossipQuest("active", decision.targetID)
@@ -186,7 +233,7 @@ local function ExecuteGossipQuestDecision(decision)
             return false
         end
 
-        if not AQG:ShouldTurnIn(decision.quest or decision.targetID) then
+        if not Decisions:ShouldTurnIn(decision.quest or decision.targetID) then
             DebugRevalidationFailed("quest no longer passes turn-in filters")
             return false
         end
@@ -206,7 +253,7 @@ local function ExecuteGossipQuestDecision(decision)
             return false
         end
 
-        if not AQG:ShouldAccept(decision.quest or decision.targetID) then
+        if not Decisions:ShouldAccept(decision.quest or decision.targetID) then
             DebugRevalidationFailed("quest no longer passes accept filters")
             return false
         end
@@ -246,7 +293,7 @@ local function ValidateGreetingTurnIn(decision)
         return false, "active quest is no longer complete"
     end
 
-    if not AQG:ShouldTurnIn(decision.quest or decision.targetID) then
+    if not Decisions:ShouldTurnIn(decision.quest or decision.targetID) then
         return false, "quest no longer passes turn-in filters"
     end
 
@@ -265,7 +312,7 @@ local function ValidateGreetingAccept(decision)
         return false, "available quest changed"
     end
 
-    if not AQG:ShouldAccept(decision.quest or decision.targetID) then
+    if not Decisions:ShouldAccept(decision.quest or decision.targetID) then
         return false, "quest no longer passes accept filters"
     end
 
@@ -274,6 +321,13 @@ end
 
 local function ExecuteQuestGreetingDecision(decision)
     if not CanExecuteDecision(decision) then
+        return false
+    end
+
+    decision = RevalidateForAction(decision, function()
+        return Decisions:DecideQuestGreetingAction()
+    end)
+    if not decision then
         return false
     end
 
@@ -313,7 +367,7 @@ end
 --------------------------------------------------------------------------------
 
 local function ValidateCurrentQuest(decision)
-    local ok, reason = Safety:ValidateCurrentQuest(decision.targetID)
+    local ok, reason = Safety:ValidateCurrentQuest(decision.targetID, "QuestFrame")
     if not ok then
         return false, reason
     end
@@ -326,7 +380,18 @@ local function ExecuteQuestAcceptConfirmDecision(decision)
         return false
     end
 
-    if not AQG:ShouldAccept(decision.quest or decision.targetID) then
+    decision = RevalidateForAction(decision, function()
+        return Decisions:DecideQuestAcceptConfirmAction(
+            decision.playerName,
+            decision.title,
+            decision.targetID
+        )
+    end)
+    if not decision then
+        return false
+    end
+
+    if not Decisions:ShouldAccept(decision.quest or decision.targetID) then
         DebugRevalidationFailed("quest no longer passes accept filters")
         return false
     end
@@ -340,6 +405,13 @@ end
 
 local function ExecuteQuestDetailDecision(decision)
     if not CanExecuteDecision(decision) then
+        return false
+    end
+
+    decision = RevalidateForAction(decision, function()
+        return Decisions:DecideQuestDetailAction(decision.targetID)
+    end)
+    if not decision then
         return false
     end
 
@@ -369,7 +441,7 @@ local function ExecuteQuestDetailDecision(decision)
         return false
     end
 
-    if not AQG:ShouldAccept(decision.quest or decision.targetID) then
+    if not Decisions:ShouldAccept(decision.quest or decision.targetID) then
         DebugRevalidationFailed("quest no longer passes accept filters")
         return false
     end
@@ -397,13 +469,20 @@ local function ExecuteQuestProgressDecision(decision)
         return false
     end
 
+    decision = RevalidateForAction(decision, function()
+        return Decisions:DecideQuestProgressAction(decision.targetID)
+    end)
+    if not decision then
+        return false
+    end
+
     local ok, reason = ValidateCurrentQuest(decision)
     if not ok then
         DebugRevalidationFailed(reason)
         return false
     end
 
-    if not AQG:ShouldTurnIn(decision.quest or decision.targetID) then
+    if not Decisions:ShouldTurnIn(decision.quest or decision.targetID) then
         DebugRevalidationFailed("quest no longer passes turn-in filters")
         return false
     end
@@ -438,9 +517,10 @@ local function ExecuteQuestProgressDecision(decision)
         return false
     end
 
-    local requiresReagent = AQG:QuestItemIsReagent()
-    if requiresReagent then
-        DebugRevalidationFailed("quest now requires a crafting reagent")
+    local blocksRequiredItem, _itemName, itemReason =
+        Decisions:RequiredQuestItemBlocksTurnIn()
+    if blocksRequiredItem then
+        DebugRevalidationFailed(itemReason)
         return false
     end
 
@@ -456,13 +536,20 @@ local function ExecuteQuestCompleteDecision(decision)
         return false
     end
 
+    decision = RevalidateForAction(decision, function()
+        return Decisions:DecideQuestCompleteAction(decision.targetID)
+    end)
+    if not decision then
+        return false
+    end
+
     local ok, reason = ValidateCurrentQuest(decision)
     if not ok then
         DebugRevalidationFailed(reason)
         return false
     end
 
-    if not AQG:ShouldTurnIn(decision.quest or decision.targetID) then
+    if not Decisions:ShouldTurnIn(decision.quest or decision.targetID) then
         DebugRevalidationFailed("quest no longer passes turn-in filters")
         return false
     end
@@ -499,7 +586,14 @@ local function ExecuteQuestAutocompleteDecision(decision)
         return false
     end
 
-    if not AQG:ShouldTurnIn(decision.quest or decision.targetID) then
+    decision = RevalidateForAction(decision, function()
+        return Decisions:DecideQuestAutocompleteAction(decision.targetID)
+    end)
+    if not decision then
+        return false
+    end
+
+    if not Decisions:ShouldTurnIn(decision.quest or decision.targetID) then
         DebugRevalidationFailed("quest no longer passes turn-in filters")
         return false
     end

@@ -7,8 +7,14 @@ local Safety = AQG.Safety
 local GetTitle = C_QuestLog.GetTitleForQuestID
 local GetInfo = C_QuestLog.GetInfo
 local GetLogIndexForQuestID = C_QuestLog.GetLogIndexForQuestID
+local QuestAccountComplete = C_QuestLog.IsQuestFlaggedCompletedOnAccount
+local IsRepeatableQuest = C_QuestLog.IsRepeatableQuest
+local GetQuestTagInfo = C_QuestLog.GetQuestTagInfo
+local IsQuestTrivial = C_QuestLog.IsQuestTrivial
 
 local RETRY_TIME_DELAY = 0.25
+local MAX_QUEST_DATA_RETRIES = 5
+local questDataRetryCounts = {}
 
 local ACTIONS = {
     GOSSIP_TURN_IN = "GOSSIP_TURN_IN",
@@ -25,6 +31,50 @@ local ACTIONS = {
 
 Decisions.Actions = ACTIONS
 
+local CONTENT_TAG_MAP = {
+      [1] = "contentGroup",
+     [41] = "contentPvP",
+     [62] = "contentRaid",
+     [81] = "contentDungeon",
+     [85] = "contentDungeon",   -- Heroic
+     [88] = "contentRaid",      -- Raid (10)
+     [89] = "contentRaid",      -- Raid (25)
+    [113] = "contentPvP",       -- PVP World Quest
+    [137] = "contentDungeon",   -- Dungeon World Quest
+    [141] = "contentRaid",      -- Raid World Quest
+    [145] = "contentDungeon",   -- Legionfall Dungeon World Quest
+    [255] = "contentPvP",       -- War Mode PvP
+    [256] = "contentPvP",       -- PvP Conquest
+    [278] = "contentPvP",       -- PVP Elite World Quest
+    [288] = "contentDelve",     -- Delve
+    [289] = "contentWorldBoss", -- World Boss
+}
+
+local function RetryKey(prefix, questID)
+    return prefix .. ":" .. tostring(questID)
+end
+
+local function ResetQuestDataRetry(key)
+    questDataRetryCounts[key] = nil
+end
+
+local function ScheduleQuestDataRetry(key, callback)
+    local retryCount = (questDataRetryCounts[key] or 0) + 1
+
+    if retryCount > MAX_QUEST_DATA_RETRIES then
+        AQG:Debug("|cffff4444[!] Quest data not cached, retry limit reached.|r")
+        return false
+    end
+
+    questDataRetryCounts[key] = retryCount
+    AQG:Debug("|cffff4444[!] Quest data not cached, retrying "
+        .. retryCount .. "/" .. MAX_QUEST_DATA_RETRIES .. "...|r")
+
+    C_Timer.After(RETRY_TIME_DELAY, callback)
+
+    return true
+end
+
 --------------------------------------------------------------------------------
 -- Quest-Specific Safe Reads
 --------------------------------------------------------------------------------
@@ -35,8 +85,222 @@ local function SafeQuestID(value)
     return questID and questID ~= 0
 end
 
+local function DebugValue(value)
+    if Safety:IsSecret(value) then
+        return "secret"
+    end
+
+    return tostring(value)
+end
+
 function Decisions:IsSafeQuestID(value)
     return SafeQuestID(value)
+end
+
+function Decisions:ClassifyQuest(questOrID)
+    local quest = type(questOrID) == "table"
+        and questOrID or { questID = questOrID }
+
+    local questID = SafeQuestID(quest.questID)
+    if not questID then
+        return false, false, false, false, false
+    end
+
+    local frequency = Safety:OptionalNumber(quest.frequency, "quest frequency")
+    local questIsDaily = QuestIsDaily and
+        Safety:SafeBoolean(QuestIsDaily(), false) or false
+    local questIsWeekly = QuestIsWeekly and
+        Safety:SafeBoolean(QuestIsWeekly(), false) or false
+    local isDaily = (frequency == 1)
+        or questIsDaily
+    local isWeekly = (frequency == 2)
+        or questIsWeekly
+    local isMetaQuest = Safety:SafeBoolean(quest.isMeta, false)
+    local tagInfo = GetQuestTagInfo and GetQuestTagInfo(questID)
+
+    if tagInfo then
+        local worldQuestType =
+            Safety:SafeBoolean(tagInfo.worldQuestType, false)
+        local tagID = Safety:SafeNumber(tagInfo.tagID)
+
+        if not isDaily and not isWeekly and worldQuestType then
+            isDaily = true
+        end
+
+        if tagID == 284 then
+            isMetaQuest = true
+        end
+    end
+
+    local isRepeatable = IsRepeatableQuest and
+        Safety:SafeBoolean(IsRepeatableQuest(questID), false) or false
+    if questID and not isDaily and not isWeekly and
+       isRepeatable then
+        isDaily = true
+    end
+
+    local apiTrivial = IsQuestTrivial and
+        Safety:SafeBoolean(IsQuestTrivial(questID), false) or false
+    local isTrivialQuest = Safety:SafeBoolean(quest.isTrivial, false)
+        or apiTrivial
+    local isWarboundCompleted = QuestAccountComplete and
+        Safety:SafeBoolean(QuestAccountComplete(questID), false) or false
+
+    return isDaily, isWeekly, isTrivialQuest, isWarboundCompleted, isMetaQuest
+end
+
+function Decisions:GetContentFilterKey(questID)
+    questID = SafeQuestID(questID)
+    if not questID then return nil end
+
+    local tagInfo = GetQuestTagInfo and GetQuestTagInfo(questID)
+
+    local tagID = tagInfo and Safety:SafeNumber(tagInfo.tagID)
+    if tagID then
+        return CONTENT_TAG_MAP[tagID]
+    end
+
+    return nil
+end
+
+function Decisions:ShouldAllowContent(questID)
+    if not SafeQuestID(questID) then
+        AQG:Debug("Content Type: quest ID unsafe, disallowed by safety.")
+        return false
+    end
+
+    local key = self:GetContentFilterKey(questID)
+
+    if key then
+        AQG:Debug("Content Type:", key,
+            AutoQuestGossipDB[key] and "Allowed by settings."
+                                   or "Disallowed by settings.")
+
+        return AutoQuestGossipDB[key]
+    end
+
+    return true
+end
+
+function Decisions:ShouldAccept(questOrID)
+    local quest = type(questOrID) == "table"
+        and questOrID or { questID = questOrID }
+
+    if not SafeQuestID(quest.questID) then
+        AQG:Debug("Accept blocked: quest ID is unsafe.")
+        return false
+    end
+
+    if not self:ShouldAllowContent(quest.questID) then return false end
+
+    local db = AutoQuestGossipDB
+    local daily, weekly, trivial, warbound, meta = self:ClassifyQuest(quest)
+
+    if     meta then return db.acceptMeta end
+    if    daily then return db.acceptDaily end
+    if   weekly then return db.acceptWeekly end
+    if  trivial then return db.acceptTrivial end
+    if warbound then return db.acceptWarboundCompleted end
+
+    return db.acceptRegular
+end
+
+function Decisions:ShouldTurnIn(questOrID)
+    local quest = type(questOrID) == "table"
+        and questOrID or { questID = questOrID }
+
+    local questID = SafeQuestID(quest.questID)
+    if not questID then
+        AQG:Debug("Turn-in blocked: quest ID is unsafe.")
+        return false
+    end
+
+    local title = Safety:OptionalString(GetTitle(questID))
+    if title and title:find("Delver's Call:", 1, true) then
+        return AutoQuestGossipDB.questTurnInDelve
+    end
+
+    return true
+end
+
+function Decisions:RequiredQuestItemBlocksTurnIn()
+    local count = GetNumQuestItems and GetNumQuestItems() or 0
+
+    for i = 1, count do
+        local name, _, _, _, _, itemID = GetQuestItemInfo("required", i)
+        local itemName, nameReason =
+            Safety:OptionalString(name, "required item name")
+
+        if nameReason then
+            return true, "?", nameReason
+        end
+
+        if itemName and not Safety:IsSafeNumber(itemID) then
+            return true, itemName, "required item ID is unsafe"
+        end
+
+        if itemName then
+            local isReagent = select(17, C_Item.GetItemInfo(itemID))
+
+            if Safety:IsSecret(isReagent) then
+                return true, itemName, "required item reagent flag is secret"
+            end
+
+            if isReagent then
+                return true, itemName, "quest requires crafting reagent"
+            end
+        end
+    end
+
+    return false
+end
+
+function Decisions:DebugQuestAPIs(questID)
+    if not AutoQuestGossipDB.debugEnabled then return end
+    AQG:Debug("  Raw APIs:")
+
+    if QuestIsDaily then
+        AQG:Debug("    QuestIsDaily() =", DebugValue(QuestIsDaily()))
+    end
+
+    if QuestIsWeekly then
+        AQG:Debug("    QuestIsWeekly() =", DebugValue(QuestIsWeekly()))
+    end
+
+    questID = SafeQuestID(questID)
+
+    if questID then
+        if IsQuestTrivial then
+            AQG:Debug("    IsQuestTrivial =", DebugValue(IsQuestTrivial(questID)))
+        end
+
+        if QuestAccountComplete then
+            AQG:Debug("    WarboundCompleted =",
+                DebugValue(QuestAccountComplete(questID)))
+        end
+
+        if IsRepeatableQuest then
+            AQG:Debug("    IsRepeatable =", DebugValue(IsRepeatableQuest(questID)))
+        end
+
+        local tagInfo = GetQuestTagInfo and GetQuestTagInfo(questID)
+
+        if tagInfo then
+            AQG:Debug("    tagID =", DebugValue(tagInfo.tagID))
+            AQG:Debug("    tagName =", DebugValue(tagInfo.tagName))
+            AQG:Debug("    worldQuestType =", DebugValue(tagInfo.worldQuestType))
+
+            local tagID = Safety:SafeNumber(tagInfo.tagID)
+            local contentKey = tagID and CONTENT_TAG_MAP[tagID]
+            if contentKey then
+                AQG:Debug("    contentFilter =", contentKey)
+            end
+        else
+            AQG:Debug("    tagInfo = nil")
+        end
+    else
+        AQG:Debug("    questID = unsafe")
+    end
 end
 
 --------------------------------------------------------------------------------
@@ -312,7 +576,7 @@ function Decisions:QuestType(questOrID)
 
     if SafeQuestID(quest.questID) then
         local daily, weekly, trivial, warbound, meta =
-            AQG:ClassifyQuest(quest)
+            self:ClassifyQuest(quest)
 
         return meta     and "Meta" or
                daily    and "Daily" or
@@ -361,13 +625,15 @@ function Decisions:IsQuestDataReady(questID, funcToRetry)
         return false
     end
 
-    if GetTitle(questID) then
+    local retryKey = RetryKey("quest", questID)
+
+    if Safety:OptionalString(GetTitle(questID)) then
+        ResetQuestDataRetry(retryKey)
         return true
     end
 
     if funcToRetry then
-        AQG:Debug("|cffff4444[!] Quest data not cached, retrying...|r")
-        C_Timer.After(RETRY_TIME_DELAY, function()
+        ScheduleQuestDataRetry(retryKey, function()
             funcToRetry(questID)
         end)
     end
@@ -379,13 +645,19 @@ function Decisions:AreContextQuestsCached(quests, funcToRetry)
     for _, quest in ipairs(quests or {}) do
         local questID = quest and quest.questID
 
-        if quest and quest.safe and SafeQuestID(questID) and not GetTitle(questID) then
+        if quest and quest.safe and SafeQuestID(questID) and
+           not Safety:OptionalString(GetTitle(questID)) then
+            local retryKey = RetryKey("context", questID)
+
             if funcToRetry then
-                AQG:Debug("|cffff4444[!] Quest data not cached, retrying...|r")
-                C_Timer.After(RETRY_TIME_DELAY, funcToRetry)
+                ScheduleQuestDataRetry(retryKey, funcToRetry)
             end
 
             return false
+        end
+
+        if quest and quest.safe and SafeQuestID(questID) then
+            ResetQuestDataRetry(RetryKey("context", questID))
         end
     end
 
@@ -421,7 +693,7 @@ function Decisions:DecideGossipQuestAction(context)
                     return Block("complete quest ID is unsafe", "unsafe quest ID")
                 end
 
-                if AQG:ShouldTurnIn(quest) then
+                if self:ShouldTurnIn(quest) then
                     local decision = Allow(
                         ACTIONS.GOSSIP_TURN_IN,
                         quest.questID,
@@ -439,7 +711,7 @@ function Decisions:DecideGossipQuestAction(context)
                 return Block("available quest ID is unsafe", "unsafe quest ID")
             end
 
-            if AQG:ShouldAccept(quest) then
+            if self:ShouldAccept(quest) then
                 local decision = Allow(
                     ACTIONS.GOSSIP_ACCEPT,
                     quest.questID,
@@ -465,7 +737,7 @@ function Decisions:DecideQuestGreetingAction()
                 return Block(reason, "unsafe active quest")
             end
 
-            if quest.isComplete and AQG:ShouldTurnIn(quest) then
+            if quest.isComplete and self:ShouldTurnIn(quest) then
                 local decision = Allow(
                     ACTIONS.GREETING_TURN_IN,
                     quest.questID,
@@ -486,7 +758,7 @@ function Decisions:DecideQuestGreetingAction()
                 return Block(reason, "unsafe available quest")
             end
 
-            if AQG:ShouldAccept(quest) then
+            if self:ShouldAccept(quest) then
                 local decision = Allow(
                     ACTIONS.GREETING_ACCEPT,
                     quest.questID,
@@ -524,7 +796,7 @@ function Decisions:DecideQuestAcceptConfirmAction(playerName, questTitle, questI
         playerName = Safety:SafeString(playerName, "?"),
     }
 
-    if not AQG:ShouldAccept(quest) then
+    if not self:ShouldAccept(quest) then
         return AddQuestMetadata(
             Block("shared quest blocked by accept filters", "accept filter"),
             quest
@@ -575,7 +847,7 @@ function Decisions:DecideQuestDetailAction(questID)
         title = self:QuestTitle(safeQuestID),
     }
 
-    if not AQG:ShouldAccept(quest) then
+    if not self:ShouldAccept(quest) then
         return AddQuestMetadata(
             Block("quest blocked by accept filters", "accept filter"),
             quest
@@ -615,7 +887,7 @@ function Decisions:DecideQuestProgressAction(questID)
         title = self:QuestTitle(safeQuestID),
     }
 
-    if not AQG:ShouldTurnIn(quest) then
+    if not self:ShouldTurnIn(quest) then
         return AddQuestMetadata(
             Block("quest blocked by turn-in filters", "turn-in filter"),
             quest
@@ -652,13 +924,14 @@ function Decisions:DecideQuestProgressAction(questID)
         )
     end
 
-    local requiresReagent, reagentName = AQG:QuestItemIsReagent()
-    if requiresReagent then
+    local blocksRequiredItem, itemName, itemReason =
+        self:RequiredQuestItemBlocksTurnIn()
+    if blocksRequiredItem then
         local decision = AddQuestMetadata(
-            Block("quest requires crafting reagent", "required reagent"),
+            Block(itemReason, "required item"),
             quest
         )
-        decision.reagentName = Safety:SafeString(reagentName, "?")
+        decision.requiredItemName = Safety:SafeString(itemName, "?")
 
         return decision
     end
@@ -691,7 +964,7 @@ function Decisions:DecideQuestCompleteAction(questID)
         title = self:QuestTitle(safeQuestID),
     }
 
-    if not AQG:ShouldTurnIn(quest) then
+    if not self:ShouldTurnIn(quest) then
         return AddQuestMetadata(
             Block("quest blocked by turn-in filters", "turn-in filter"),
             quest
@@ -752,7 +1025,7 @@ function Decisions:DecideQuestAutocompleteAction(questID)
         questID = safeQuestID,
     }
 
-    if not AQG:ShouldTurnIn(quest) then
+    if not self:ShouldTurnIn(quest) then
         return AddQuestMetadata(
             Block("quest blocked by turn-in filters", "turn-in filter"),
             quest
