@@ -20,12 +20,13 @@ local function DebugQuestDecisionDetails(decision)
     end
 end
 
-local function DebugDecision(eventName, decision)
+local function DebugDecision(eventName, decision, options)
     Safety:DebugDecisionEvent(
         eventName,
         "Quest",
         decision,
-        DebugQuestDecisionDetails
+        DebugQuestDecisionDetails,
+        options
     )
 end
 
@@ -233,8 +234,11 @@ local function ExecuteGossipQuestDecision(decision)
             return false
         end
 
-        if not Decisions:ShouldTurnIn(decision.quest or decision.targetID) then
-            DebugRevalidationFailed("quest no longer passes turn-in filters")
+        local shouldTurnIn, turnInReason =
+            Decisions:ShouldTurnIn(decision.quest or decision.targetID)
+        if not shouldTurnIn then
+            DebugRevalidationFailed(turnInReason
+                or "quest no longer passes turn-in filters")
             return false
         end
 
@@ -253,8 +257,11 @@ local function ExecuteGossipQuestDecision(decision)
             return false
         end
 
-        if not Decisions:ShouldAccept(decision.quest or decision.targetID) then
-            DebugRevalidationFailed("quest no longer passes accept filters")
+        local shouldAccept, acceptReason =
+            Decisions:ShouldAccept(decision.quest or decision.targetID)
+        if not shouldAccept then
+            DebugRevalidationFailed(acceptReason
+                or "quest no longer passes accept filters")
             return false
         end
 
@@ -293,8 +300,10 @@ local function ValidateGreetingTurnIn(decision)
         return false, "active quest is no longer complete"
     end
 
-    if not Decisions:ShouldTurnIn(decision.quest or decision.targetID) then
-        return false, "quest no longer passes turn-in filters"
+    local shouldTurnIn, turnInReason =
+        Decisions:ShouldTurnIn(decision.quest or decision.targetID)
+    if not shouldTurnIn then
+        return false, turnInReason or "quest no longer passes turn-in filters"
     end
 
     return true, nil
@@ -312,8 +321,10 @@ local function ValidateGreetingAccept(decision)
         return false, "available quest changed"
     end
 
-    if not Decisions:ShouldAccept(decision.quest or decision.targetID) then
-        return false, "quest no longer passes accept filters"
+    local shouldAccept, acceptReason =
+        Decisions:ShouldAccept(decision.quest or decision.targetID)
+    if not shouldAccept then
+        return false, acceptReason or "quest no longer passes accept filters"
     end
 
     return true, nil
@@ -391,8 +402,11 @@ local function ExecuteQuestAcceptConfirmDecision(decision)
         return false
     end
 
-    if not Decisions:ShouldAccept(decision.quest or decision.targetID) then
-        DebugRevalidationFailed("quest no longer passes accept filters")
+    local shouldAccept, acceptReason =
+        Decisions:ShouldAccept(decision.quest or decision.targetID)
+    if not shouldAccept then
+        DebugRevalidationFailed(acceptReason
+            or "quest no longer passes accept filters")
         return false
     end
 
@@ -441,8 +455,11 @@ local function ExecuteQuestDetailDecision(decision)
         return false
     end
 
-    if not Decisions:ShouldAccept(decision.quest or decision.targetID) then
-        DebugRevalidationFailed("quest no longer passes accept filters")
+    local shouldAccept, acceptReason =
+        Decisions:ShouldAccept(decision.quest or decision.targetID)
+    if not shouldAccept then
+        DebugRevalidationFailed(acceptReason
+            or "quest no longer passes accept filters")
         return false
     end
 
@@ -482,8 +499,11 @@ local function ExecuteQuestProgressDecision(decision)
         return false
     end
 
-    if not Decisions:ShouldTurnIn(decision.quest or decision.targetID) then
-        DebugRevalidationFailed("quest no longer passes turn-in filters")
+    local shouldTurnIn, turnInReason =
+        Decisions:ShouldTurnIn(decision.quest or decision.targetID)
+    if not shouldTurnIn then
+        DebugRevalidationFailed(turnInReason
+            or "quest no longer passes turn-in filters")
         return false
     end
 
@@ -549,8 +569,11 @@ local function ExecuteQuestCompleteDecision(decision)
         return false
     end
 
-    if not Decisions:ShouldTurnIn(decision.quest or decision.targetID) then
-        DebugRevalidationFailed("quest no longer passes turn-in filters")
+    local shouldTurnIn, turnInReason =
+        Decisions:ShouldTurnIn(decision.quest or decision.targetID)
+    if not shouldTurnIn then
+        DebugRevalidationFailed(turnInReason
+            or "quest no longer passes turn-in filters")
         return false
     end
 
@@ -593,8 +616,11 @@ local function ExecuteQuestAutocompleteDecision(decision)
         return false
     end
 
-    if not Decisions:ShouldTurnIn(decision.quest or decision.targetID) then
-        DebugRevalidationFailed("quest no longer passes turn-in filters")
+    local shouldTurnIn, turnInReason =
+        Decisions:ShouldTurnIn(decision.quest or decision.targetID)
+    if not shouldTurnIn then
+        DebugRevalidationFailed(turnInReason
+            or "quest no longer passes turn-in filters")
         return false
     end
 
@@ -661,7 +687,9 @@ function Quest:HandleGossipShow(context, retryFunc)
     end
 
     local decision = Decisions:DecideGossipQuestAction(context)
-    DebugDecision("GOSSIP_SHOW (Quest)", decision)
+    DebugDecision("GOSSIP_SHOW (Quest)", decision, {
+        suppressInteractionHeader = true,
+    })
 
     return MakeGossipQuestResult(
         decision,

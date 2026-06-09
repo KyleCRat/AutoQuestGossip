@@ -110,8 +110,14 @@ function AQG:DebugSeparator(event)
     if not AutoQuestGossipDB.debugEnabled or
        not self.PanelPrint then return end
 
+    local section = event
+    local gossipSection = event and event:match("^GOSSIP_SHOW %((.+)%)$")
+    if gossipSection then
+        section = gossipSection
+    end
+
     self:PanelPrint(
-        "|cff00ccff--- " .. event .. " ---|r"
+        "|cff00ccff--- " .. section .. " ---|r"
     )
     self:PanelPrint(
         "NPC: " .. self:GetNPCName()
@@ -127,6 +133,18 @@ function AQG:DebugSeparator(event)
 
         if anchor then self:ShowPanel(anchor) end
     end
+end
+
+function AQG:DebugInteractionSeparator(event)
+    if not AutoQuestGossipDB.debugEnabled or
+       not self.PanelPrint then return end
+
+    self:PanelPrint("|cff00ccff========================================|r")
+    self:PanelPrint(
+        "|cff00ccff" .. (event or "UNKNOWN") .. " - " ..
+        self:GetNPCName() .. "|r"
+    )
+    self:PanelPrint("|cff00ccff========================================|r")
 end
 
 -- Event frame

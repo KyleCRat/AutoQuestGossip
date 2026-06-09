@@ -34,8 +34,12 @@ local function RetryGossipShow(expectedContext)
     return RunGossipShow()
 end
 
-RunGossipShow = function()
+RunGossipShow = function(debugInteraction)
     local context = Context:Build("GOSSIP_SHOW")
+    if debugInteraction and Context.DebugInteraction then
+        Context:DebugInteraction("GOSSIP_SHOW", context)
+    end
+
     local questResult = Quest:HandleGossipShow(context, function()
         RetryGossipShow(context)
     end)
@@ -54,7 +58,7 @@ RunGossipShow = function()
 end
 
 function Coordinator:HandleGossipShow()
-    return RunGossipShow()
+    return RunGossipShow(true)
 end
 
 AQG:RegisterEvent("GOSSIP_SHOW", function()

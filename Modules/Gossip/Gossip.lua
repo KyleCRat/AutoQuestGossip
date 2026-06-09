@@ -38,12 +38,13 @@ local function DebugGossipDecisionDetails(decision)
     end
 end
 
-local function DebugDecision(eventName, decision)
+local function DebugDecision(eventName, decision, options)
     Safety:DebugDecisionEvent(
         eventName,
         "Gossip",
         decision,
-        DebugGossipDecisionDetails
+        DebugGossipDecisionDetails,
+        options
     )
 end
 
@@ -186,7 +187,9 @@ end
 function Gossip:HandleGossipShow(context)
     local decision = Decisions:DecideGossipAction(context)
 
-    DebugDecision("GOSSIP_SHOW (Gossip)", decision)
+    DebugDecision("GOSSIP_SHOW (Gossip)", decision, {
+        suppressInteractionHeader = true,
+    })
     return MakeGossipResult(decision, ExecuteGossipDecision(decision))
 end
 

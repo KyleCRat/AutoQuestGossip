@@ -388,8 +388,13 @@ local function DebugGossipOptions(gossip)
     AQG:Debug("Gossip options:")
 
     for _, option in ipairs(gossip.options) do
+        local icon = ""
+        if Safety:IsSafeNumber(option.displayIcon) then
+            icon = "|T" .. option.displayIcon .. ":0|t "
+        end
+
         AQG:Debug("  " .. DebugValue(option.index) .. ". " ..
-            DebugValue(option.name) ..
+            icon .. DebugValue(option.name) ..
             " (ID: " .. DebugValue(option.optionID) ..
             ", iconID: " .. DebugValue(option.icon) ..
             ", overrideIconID: " .. DebugValue(option.overrideIconID) ..
@@ -456,41 +461,47 @@ function Context:Debug(context)
     local quests = context.quests or {}
 
     AQG:DebugSeparator((context.event or "UNKNOWN") .. " (Context)")
-    AQG:Debug("NPC safety:", npc.safe and "safe" or "unsafe",
-        npc.blocked and "blocked" or "not blocked",
-        npc.blockReason or "")
-    AQG:Debug("Gossip summary:", gossip.optionCount or 0,
-        "unsafe:", gossip.unsafeOptionCount or 0,
-        "cinematic:", tostring(gossip.hasCinematic),
-        "delve:", tostring(gossip.hasDelve),
-        "unknownIcon:", tostring(gossip.hasUnknownIcon))
-    AQG:Debug("Quest summary: active:", #(quests.active or {}),
-        "available:", #(quests.available or {}),
-        "completable:", tostring(quests.hasCompletable),
-        "unsafe:", quests.unsafeQuestCount or 0)
+    AQG:Debug("  identity: " .. (npc.safe and "safe" or "unsafe"))
+    AQG:Debug("  blocklist: " .. (npc.blocked and "blocked" or "not blocked"))
+    if npc.blockReason then
+        AQG:Debug("  reason: " .. npc.blockReason)
+    end
+
+    AQG:Debug("Gossip summary:")
+    AQG:Debug("  options: " .. tostring(gossip.optionCount or 0))
+    AQG:Debug("  unsafe options: " .. tostring(gossip.unsafeOptionCount or 0))
+    AQG:Debug("  has cinematic: " .. tostring(gossip.hasCinematic))
+    AQG:Debug("  has delve: " .. tostring(gossip.hasDelve))
+    AQG:Debug("  has unknown icon: " .. tostring(gossip.hasUnknownIcon))
+
+    AQG:Debug("Quest summary:")
+    AQG:Debug("  active quests: " .. tostring(#(quests.active or {})))
+    AQG:Debug("  available quests: " .. tostring(#(quests.available or {})))
+    AQG:Debug("  has completable quest: " .. tostring(quests.hasCompletable))
+    AQG:Debug("  unsafe quests: " .. tostring(quests.unsafeQuestCount or 0))
     DebugQuestList("Active quests", quests.active)
     DebugQuestList("Available quests", quests.available)
     DebugGossipOptions(gossip)
 end
 
 --------------------------------------------------------------------------------
--- Passive Debug Event Observer
+-- Debug Event Output
 --------------------------------------------------------------------------------
 
-local function DebugCurrentInteraction(eventName)
+function Context:DebugInteraction(eventName, context)
     if not AutoQuestGossipDB or not AutoQuestGossipDB.debugEnabled then
         return
     end
 
     AQG:PanelScrollToBottom()
 
-    Context:Debug(Context:Build(eventName))
+    if AQG.DebugInteractionSeparator then
+        AQG:DebugInteractionSeparator(eventName)
+    end
+
+    self:Debug(context or self:Build(eventName))
 end
 
-AQG:RegisterEvent("GOSSIP_SHOW", function()
-    DebugCurrentInteraction("GOSSIP_SHOW")
-end)
-
 AQG:RegisterEvent("GOSSIP_OPTIONS_REFRESHED", function()
-    DebugCurrentInteraction("GOSSIP_OPTIONS_REFRESHED")
+    Context:DebugInteraction("GOSSIP_OPTIONS_REFRESHED")
 end)

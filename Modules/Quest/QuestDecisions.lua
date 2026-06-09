@@ -15,6 +15,7 @@ local IsQuestTrivial = C_QuestLog.IsQuestTrivial
 local RETRY_TIME_DELAY = 0.25
 local MAX_QUEST_DATA_RETRIES = 10
 local questDataRetryCounts = {}
+local pendingQuestDataRetries = {}
 
 local ACTIONS = {
     GOSSIP_TURN_IN = "GOSSIP_TURN_IN",
@@ -56,9 +57,14 @@ end
 
 local function ResetQuestDataRetry(key)
     questDataRetryCounts[key] = nil
+    pendingQuestDataRetries[key] = nil
 end
 
 local function ScheduleQuestDataRetry(key, callback)
+    if pendingQuestDataRetries[key] then
+        return true
+    end
+
     local retryCount = (questDataRetryCounts[key] or 0) + 1
 
     if retryCount > MAX_QUEST_DATA_RETRIES then
@@ -67,10 +73,14 @@ local function ScheduleQuestDataRetry(key, callback)
     end
 
     questDataRetryCounts[key] = retryCount
+    pendingQuestDataRetries[key] = true
     AQG:Debug("|cffff4444[!] Quest data not cached, retrying "
         .. retryCount .. "/" .. MAX_QUEST_DATA_RETRIES .. "...|r")
 
-    C_Timer.After(RETRY_TIME_DELAY, callback)
+    C_Timer.After(RETRY_TIME_DELAY, function()
+        pendingQuestDataRetries[key] = nil
+        callback()
+    end)
 
     return true
 end
@@ -95,6 +105,18 @@ local function DebugValue(value)
     end
 
     return tostring(value)
+end
+
+local function DisabledSettingReason(category, key)
+    return category .. " " .. key .. " is disabled in settings"
+end
+
+local function SettingAllowed(category, key, enabled)
+    if enabled then
+        return true, nil
+    end
+
+    return false, DisabledSettingReason(category, key)
 end
 
 function Decisions:IsSafeQuestID(value)
@@ -168,22 +190,22 @@ function Decisions:GetContentFilterKey(questID)
 end
 
 function Decisions:ShouldAllowContent(questID)
-    if not SafeQuestID(questID) then
-        AQG:Debug("Content Type: quest ID unsafe, disallowed by safety.")
-        return false
+    questID = SafeQuestID(questID)
+    if not questID then
+        return false, "quest ID is unsafe"
     end
 
     local key = self:GetContentFilterKey(questID)
 
     if key then
-        AQG:Debug("Content Type:", key,
-            AutoQuestGossipDB[key] and "Allowed by settings."
-                                   or "Disallowed by settings.")
-
-        return AutoQuestGossipDB[key]
+        return SettingAllowed(
+            "content type",
+            key,
+            AutoQuestGossipDB and AutoQuestGossipDB[key]
+        )
     end
 
-    return true
+    return true, nil
 end
 
 function Decisions:ShouldAccept(questOrID)
@@ -191,22 +213,22 @@ function Decisions:ShouldAccept(questOrID)
         and questOrID or { questID = questOrID }
 
     if not SafeQuestID(quest.questID) then
-        AQG:Debug("Accept blocked: quest ID is unsafe.")
-        return false
+        return false, "quest ID is unsafe"
     end
 
-    if not self:ShouldAllowContent(quest.questID) then return false end
+    local allowed, reason = self:ShouldAllowContent(quest.questID)
+    if not allowed then return false, reason end
 
     local db = AutoQuestGossipDB
     local daily, weekly, trivial, warbound, meta = self:ClassifyQuest(quest)
 
-    if     meta then return db.acceptMeta end
-    if    daily then return db.acceptDaily end
-    if   weekly then return db.acceptWeekly end
-    if  trivial then return db.acceptTrivial end
-    if warbound then return db.acceptWarboundCompleted end
+    if     meta then return SettingAllowed("accept filter", "acceptMeta", db.acceptMeta) end
+    if    daily then return SettingAllowed("accept filter", "acceptDaily", db.acceptDaily) end
+    if   weekly then return SettingAllowed("accept filter", "acceptWeekly", db.acceptWeekly) end
+    if  trivial then return SettingAllowed("accept filter", "acceptTrivial", db.acceptTrivial) end
+    if warbound then return SettingAllowed("accept filter", "acceptWarboundCompleted", db.acceptWarboundCompleted) end
 
-    return db.acceptRegular
+    return SettingAllowed("accept filter", "acceptRegular", db.acceptRegular)
 end
 
 function Decisions:ShouldTurnIn(questOrID)
@@ -215,16 +237,19 @@ function Decisions:ShouldTurnIn(questOrID)
 
     local questID = SafeQuestID(quest.questID)
     if not questID then
-        AQG:Debug("Turn-in blocked: quest ID is unsafe.")
-        return false
+        return false, "quest ID is unsafe"
     end
 
     local title = Safety:OptionalString(GetTitle(questID))
     if title and title:find("Delver's Call:", 1, true) then
-        return AutoQuestGossipDB.questTurnInDelve
+        return SettingAllowed(
+            "turn-in filter",
+            "questTurnInDelve",
+            AutoQuestGossipDB and AutoQuestGossipDB.questTurnInDelve
+        )
     end
 
-    return true
+    return true, nil
 end
 
 function Decisions:RequiredQuestItemBlocksTurnIn()
@@ -690,6 +715,9 @@ function Decisions:DecideGossipQuestAction(context)
         return Block("quest data contains unsafe fields", "unsafe quest data")
     end
 
+    local skippedReason
+    local skippedQuest
+
     if AutoQuestGossipDB.questTurnInEnabled then
         for _, quest in ipairs(quests.active or {}) do
             if quest.isComplete then
@@ -697,13 +725,17 @@ function Decisions:DecideGossipQuestAction(context)
                     return Block("complete quest ID is unsafe", "unsafe quest ID")
                 end
 
-                if self:ShouldTurnIn(quest) then
+                local shouldTurnIn, turnInReason = self:ShouldTurnIn(quest)
+                if shouldTurnIn then
                     local decision = Allow(
                         ACTIONS.GOSSIP_TURN_IN,
                         quest.questID,
                         "completed gossip quest"
                     )
                     return AddQuestMetadata(decision, quest)
+                elseif turnInReason and not skippedReason then
+                    skippedReason = turnInReason
+                    skippedQuest = quest
                 end
             end
         end
@@ -715,15 +747,23 @@ function Decisions:DecideGossipQuestAction(context)
                 return Block("available quest ID is unsafe", "unsafe quest ID")
             end
 
-            if self:ShouldAccept(quest) then
+            local shouldAccept, acceptReason = self:ShouldAccept(quest)
+            if shouldAccept then
                 local decision = Allow(
                     ACTIONS.GOSSIP_ACCEPT,
                     quest.questID,
                     "allowed available gossip quest"
                 )
                 return AddQuestMetadata(decision, quest)
+            elseif acceptReason and not skippedReason then
+                skippedReason = acceptReason
+                skippedQuest = quest
             end
         end
+    end
+
+    if skippedReason then
+        return AddQuestMetadata(Block(skippedReason, "quest filter"), skippedQuest)
     end
 
     return NoAction("no eligible gossip quest action")
@@ -733,6 +773,9 @@ function Decisions:DecideQuestGreetingAction()
     local block = CheckCommonQuestState(true)
     if block then return block end
 
+    local skippedReason
+    local skippedQuest
+
     if AutoQuestGossipDB.questTurnInEnabled then
         for index = 1, GetNumActiveQuests() do
             local quest, reason = BuildGreetingActiveQuest(index)
@@ -741,15 +784,21 @@ function Decisions:DecideQuestGreetingAction()
                 return Block(reason, "unsafe active quest")
             end
 
-            if quest.isComplete and self:ShouldTurnIn(quest) then
-                local decision = Allow(
-                    ACTIONS.GREETING_TURN_IN,
-                    quest.questID,
-                    "completed quest greeting quest"
-                )
-                decision.index = index
+            if quest.isComplete then
+                local shouldTurnIn, turnInReason = self:ShouldTurnIn(quest)
+                if shouldTurnIn then
+                    local decision = Allow(
+                        ACTIONS.GREETING_TURN_IN,
+                        quest.questID,
+                        "completed quest greeting quest"
+                    )
+                    decision.index = index
 
-                return AddQuestMetadata(decision, quest)
+                    return AddQuestMetadata(decision, quest)
+                elseif turnInReason and not skippedReason then
+                    skippedReason = turnInReason
+                    skippedQuest = quest
+                end
             end
         end
     end
@@ -762,7 +811,8 @@ function Decisions:DecideQuestGreetingAction()
                 return Block(reason, "unsafe available quest")
             end
 
-            if self:ShouldAccept(quest) then
+            local shouldAccept, acceptReason = self:ShouldAccept(quest)
+            if shouldAccept then
                 local decision = Allow(
                     ACTIONS.GREETING_ACCEPT,
                     quest.questID,
@@ -771,8 +821,15 @@ function Decisions:DecideQuestGreetingAction()
                 decision.index = index
 
                 return AddQuestMetadata(decision, quest)
+            elseif acceptReason and not skippedReason then
+                skippedReason = acceptReason
+                skippedQuest = quest
             end
         end
+    end
+
+    if skippedReason then
+        return AddQuestMetadata(Block(skippedReason, "quest filter"), skippedQuest)
     end
 
     return NoAction("no eligible quest greeting action")
@@ -800,9 +857,11 @@ function Decisions:DecideQuestAcceptConfirmAction(playerName, questTitle, questI
         playerName = Safety:SafeString(playerName, "?"),
     }
 
-    if not self:ShouldAccept(quest) then
+    local shouldAccept, acceptReason = self:ShouldAccept(quest)
+    if not shouldAccept then
         return AddQuestMetadata(
-            Block("shared quest blocked by accept filters", "accept filter"),
+            Block(acceptReason or "shared quest blocked by accept filters",
+                "accept filter"),
             quest
         )
     end
@@ -851,9 +910,11 @@ function Decisions:DecideQuestDetailAction(questID)
         title = self:QuestTitle(safeQuestID),
     }
 
-    if not self:ShouldAccept(quest) then
+    local shouldAccept, acceptReason = self:ShouldAccept(quest)
+    if not shouldAccept then
         return AddQuestMetadata(
-            Block("quest blocked by accept filters", "accept filter"),
+            Block(acceptReason or "quest blocked by accept filters",
+                "accept filter"),
             quest
         )
     end
@@ -891,9 +952,11 @@ function Decisions:DecideQuestProgressAction(questID)
         title = self:QuestTitle(safeQuestID),
     }
 
-    if not self:ShouldTurnIn(quest) then
+    local shouldTurnIn, turnInReason = self:ShouldTurnIn(quest)
+    if not shouldTurnIn then
         return AddQuestMetadata(
-            Block("quest blocked by turn-in filters", "turn-in filter"),
+            Block(turnInReason or "quest blocked by turn-in filters",
+                "turn-in filter"),
             quest
         )
     end
@@ -968,9 +1031,11 @@ function Decisions:DecideQuestCompleteAction(questID)
         title = self:QuestTitle(safeQuestID),
     }
 
-    if not self:ShouldTurnIn(quest) then
+    local shouldTurnIn, turnInReason = self:ShouldTurnIn(quest)
+    if not shouldTurnIn then
         return AddQuestMetadata(
-            Block("quest blocked by turn-in filters", "turn-in filter"),
+            Block(turnInReason or "quest blocked by turn-in filters",
+                "turn-in filter"),
             quest
         )
     end
@@ -1029,9 +1094,11 @@ function Decisions:DecideQuestAutocompleteAction(questID)
         questID = safeQuestID,
     }
 
-    if not self:ShouldTurnIn(quest) then
+    local shouldTurnIn, turnInReason = self:ShouldTurnIn(quest)
+    if not shouldTurnIn then
         return AddQuestMetadata(
-            Block("quest blocked by turn-in filters", "turn-in filter"),
+            Block(turnInReason or "quest blocked by turn-in filters",
+                "turn-in filter"),
             quest
         )
     end

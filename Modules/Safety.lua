@@ -3,6 +3,8 @@ local _, AQG = ...
 local UNKNOWN_VALUE = "?"
 AQG.Safety = AQG.Safety or {}
 local Safety = AQG.Safety
+local DEBUG_DEDUPE_SECONDS = 0.75
+local recentDecisionDebug = {}
 
 -- Shared safety helpers only. Quest and gossip policy should stay in their
 -- own decision modules.
@@ -51,6 +53,88 @@ local function ListToString(values)
     end
 
     return table.concat(parts, ", ")
+end
+
+local function DebugList(label, values)
+    if type(values) ~= "table" or #values == 0 then
+        AQG:Debug("  " .. label .. ": none")
+        return
+    end
+
+    AQG:Debug("  " .. label .. ":")
+
+    for _, value in ipairs(values) do
+        AQG:Debug("    - " .. SafeDebugValue(value))
+    end
+end
+
+local function ShouldPrintBlockers(decision)
+    local blockers = decision and decision.blockers
+    if type(blockers) ~= "table" or #blockers == 0 then
+        return false
+    end
+
+    if #blockers == 1 and decision.reason and decision.reason ~= "" then
+        return false
+    end
+
+    return true
+end
+
+local function DecisionResult(decision)
+    if not decision then
+        return "NONE"
+    end
+
+    if decision.allowed then
+        return "ALLOW"
+    end
+
+    if type(decision.blockers) == "table" and #decision.blockers > 0 then
+        return "BLOCK"
+    end
+
+    return "NO ACTION"
+end
+
+local function DecisionDebugSignature(eventName, domain, decision)
+    local npcID = AQG.GetNPCID and AQG:GetNPCID() or "?"
+    local npcName = AQG.GetNPCName and AQG:GetNPCName() or "?"
+
+    if not decision then
+        return table.concat({
+            tostring(eventName),
+            tostring(domain),
+            tostring(npcID),
+            tostring(npcName),
+            "none",
+        }, "|")
+    end
+
+    return table.concat({
+        tostring(eventName),
+        tostring(domain),
+        tostring(npcID),
+        tostring(npcName),
+        DecisionResult(decision),
+        tostring(decision.action or "none"),
+        decision.targetID and SafeDebugValue(decision.targetID) or "none",
+        tostring(decision.reason or "none"),
+        ListToString(decision.blockers),
+        ListToString(decision.warnings),
+    }, "|")
+end
+
+local function ShouldSuppressDecisionDebug(signature)
+    if not GetTime then
+        return false
+    end
+
+    local now = GetTime()
+    local lastPrinted = recentDecisionDebug[signature]
+    recentDecisionDebug[signature] = now
+
+    return lastPrinted and (now - lastPrinted) < DEBUG_DEDUPE_SECONDS
 end
 
 --------------------------------------------------------------------------------
@@ -232,24 +316,41 @@ function Safety:DebugDecision(domain, decision)
     end
 
     if not decision then
-        AQG:Debug(domain or "Decision", "decision: none")
+        AQG:Debug((domain or "Decision") .. " decision:")
+        AQG:Debug("  result: NONE")
+        AQG:Debug("  reason: no decision was built")
         return
     end
 
-    local state = decision.allowed and "ALLOW" or "BLOCK"
+    AQG:Debug((domain or "Decision") .. " decision:")
+    AQG:Debug("  result: " .. DecisionResult(decision))
+    AQG:Debug("  action: " .. (decision.action or "none"))
+    AQG:Debug("  target: " ..
+        (decision.targetID and SafeDebugValue(decision.targetID) or "none"))
+    AQG:Debug("  reason: " .. (decision.reason or "none"))
 
-    AQG:Debug(domain or "Decision", "decision:", state,
-        "action:", decision.action or "none",
-        "target:", decision.targetID and SafeDebugValue(decision.targetID) or "none",
-        "reason:", decision.reason or "none")
+    if ShouldPrintBlockers(decision) then
+        DebugList("additional blockers", decision.blockers)
+    end
 
-    AQG:Debug("  blockers:", ListToString(decision.blockers))
-    AQG:Debug("  warnings:", ListToString(decision.warnings))
+    if type(decision.warnings) == "table" and #decision.warnings > 0 then
+        DebugList("warnings", decision.warnings)
+    end
 end
 
-function Safety:DebugDecisionEvent(eventName, domain, decision, detailsFunc)
+function Safety:DebugDecisionEvent(eventName, domain, decision, detailsFunc, options)
     if not AutoQuestGossipDB or not AutoQuestGossipDB.debugEnabled then
         return
+    end
+
+    local signature = DecisionDebugSignature(eventName, domain, decision)
+    if ShouldSuppressDecisionDebug(signature) then
+        return
+    end
+
+    if not (options and options.suppressInteractionHeader) and
+       AQG.DebugInteractionSeparator then
+        AQG:DebugInteractionSeparator(eventName)
     end
 
     AQG:DebugSeparator(eventName)
@@ -266,14 +367,17 @@ function Safety:DebugDecisionExecution(domain, decision, label)
     end
 
     if not decision then
-        AQG:Debug(domain or "Decision", "execute: no decision")
+        AQG:Debug((domain or "Decision") .. " execution:")
+        AQG:Debug("  result: NO ACTION")
+        AQG:Debug("  reason: no decision was built")
         return
     end
 
-    AQG:Debug(domain or "Decision", "execute:",
-        "action:", decision.action or "none",
-        "target:", decision.targetID and SafeDebugValue(decision.targetID) or "none",
-        "label:", label or "none")
+    AQG:Debug((domain or "Decision") .. " execution:")
+    AQG:Debug("  action: " .. (decision.action or "none"))
+    AQG:Debug("  target: " ..
+        (decision.targetID and SafeDebugValue(decision.targetID) or "none"))
+    AQG:Debug("  label: " .. (label or "none"))
 end
 
 function Safety:DebugRevalidationFailed(reason)
@@ -281,7 +385,8 @@ function Safety:DebugRevalidationFailed(reason)
         return
     end
 
-    AQG:Debug("-> Revalidation failed:", reason or "unknown")
+    AQG:Debug("Revalidation failed:")
+    AQG:Debug("  reason: " .. (reason or "unknown"))
 end
 
 function Safety:WarnDecision(decision)
