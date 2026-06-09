@@ -39,7 +39,9 @@ AQG:OnInit(function()
     AddHeader("Content Type Filters")
     AddCheckbox("contentDungeon", "Dungeon Quests", "Allow automation of quests tagged as dungeon content")
     AddCheckbox("contentRaid", "Raid Quests", "Allow automation of quests tagged as raid content")
-    AddCheckbox("contentPvP", "PvP Quests", "Allow automation of quests tagged as PvP content")
+    AddCheckbox("contentPvP", "PvP Quests",
+        "Allow automation of quests tagged as PvP content. " ..
+        "Quests that would flag you for PvP still require manual acceptance.")
     AddCheckbox("contentGroup", "Group Quests", "Allow automation of quests tagged as requiring a group")
     AddCheckbox("contentDelve", "Delve Quests", "Allow automation of quests tagged as delve content")
     AddCheckbox("contentWorldBoss", "World Boss Quests", "Allow automation of quests tagged as world boss content")
@@ -68,6 +70,9 @@ AQG:OnInit(function()
     AddCheckbox("gossipOnlySingle", "Only Auto-Select Single Option",
         "When enabled, gossip will only be auto-selected if there is exactly one option. " ..
         "If there are multiple options, you choose manually.")
+    AddCheckbox("allowSafeFallbackGossip", "Allow Safe Fallback Gossip",
+        "Allow AQG to select one safe, available, known-icon gossip option when no quest, vendor, " ..
+        "or Blizzard auto-select option applies. If multiple fallback options are available, AQG still pauses.")
     AddCheckbox("pauseOnAngleBracket", "Pause on Bracket <Option>",
         "Pause automation when a gossip option contains angle bracket text (e.g. <Do something>). " ..
         "These often indicate player choices that may have consequences.")

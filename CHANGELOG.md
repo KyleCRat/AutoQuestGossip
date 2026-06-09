@@ -13,7 +13,7 @@
 - Gossip loop detection with automatic reset on gossip close
 - NPC blocklists by ID and name (Soiree NPCs, Zidormi, Lindormi, Teleport Pad, Delvers' Supplies, etc.)
 - Pause on skip options, important (colored) options, angle bracket options, and cinematics
-- Stay Awhile and Listen detection — blocks vendor/fallback selection while allowing quest options
+- Stay Awhile and Listen detection - blocks vendor/fallback selection while allowing quest options
 - Setting to control Delver's Call quest turn-ins separately
 - Debug panel with scrollable, copyable output anchored to quest/gossip frames
 - Detached debug panel mode via `/aqg debug`

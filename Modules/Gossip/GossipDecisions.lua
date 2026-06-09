@@ -69,6 +69,11 @@ local function ForceGossip()
     return forceGossip, reason
 end
 
+local function SafeFallbackGossipEnabled()
+    return AutoQuestGossipDB and
+        AutoQuestGossipDB.allowSafeFallbackGossip ~= false
+end
+
 local function ShouldPauseForImportantOption(option)
     return option and option.isImportant and not option.isDelve
 end
@@ -324,6 +329,10 @@ function Decisions:FindBestGossipOption(context)
         return ACTIONS.SELECT_VENDOR, vendorOption
     end
 
+    if not SafeFallbackGossipEnabled() then
+        return nil, nil
+    end
+
     local fallbackOptions = FindFallbackOptions(options)
     if #fallbackOptions == 1 then
         return ACTIONS.SELECT_FALLBACK, fallbackOptions[1]
@@ -372,6 +381,10 @@ function Decisions:DecideGossipAction(context)
     local vendorOption = FindVendorOption(options)
     if vendorOption then
         return Allow(ACTIONS.SELECT_VENDOR, vendorOption, "safe vendor option")
+    end
+
+    if not SafeFallbackGossipEnabled() then
+        return Block("safe fallback gossip disabled", "fallback disabled")
     end
 
     if (gossip.optionCount or 0) > MAX_FALLBACK_OPTIONS then

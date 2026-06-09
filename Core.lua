@@ -39,6 +39,7 @@ local defaults = {
     -- Gossip settings
     gossipEnabled = true,
     gossipOnlySingle = true,
+    allowSafeFallbackGossip = true,
     pauseOnAngleBracket = true,
 
     -- Output modes
@@ -61,7 +62,7 @@ end
 function AQG:PausedByModKey(module_name)
     if IsModifierDown() then
         self:Debug("|cffff4444->", "["..module_name.."] Modifier key held",
-                   " — automation paused.|r")
+                   " - automation paused.|r")
         return true
     end
 

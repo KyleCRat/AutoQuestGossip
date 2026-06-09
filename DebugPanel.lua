@@ -48,7 +48,7 @@ scrollFrame:SetPoint("TOPLEFT", panel, "TOPLEFT", PADDING, -(PADDING * 2 + FONT_
 scrollFrame:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -PADDING, PADDING)
 scrollFrame:EnableMouseWheel(true)
 
--- Scroll child — anchored to BOTTOMLEFT so content grows upward
+-- Scroll child - anchored to BOTTOMLEFT so content grows upward
 local scrollChild = CreateFrame("Frame", nil, scrollFrame)
 scrollChild:SetWidth(PANEL_WIDTH - PADDING * 2)
 scrollChild:SetHeight(1) -- grows dynamically
@@ -63,7 +63,7 @@ measure:SetWidth(PANEL_WIDTH - PADDING * 2)
 measure:SetAlpha(0)
 measure:SetPoint("BOTTOMLEFT", scrollChild, "BOTTOMLEFT", 0, 0)
 
--- Content EditBox (selectable/copyable) — anchored to bottom
+-- Content EditBox (selectable/copyable) - anchored to bottom
 local content = CreateFrame("EditBox", nil, scrollChild)
 content:SetFont(FONT_PATH, FONT_SIZE, "")
 content:SetTextColor(0.9, 0.9, 0.9, 1)
