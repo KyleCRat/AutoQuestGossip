@@ -10,6 +10,7 @@ DebugPanel.lua
 Blocklists\BlockedNPCNames.lua
 Blocklists\BlockedNPCIDs.lua
 Modules\Safety.lua
+Modules\InteractionContext.lua
 Modules\Quest.lua
 Modules\Gossip.lua
 Settings.lua

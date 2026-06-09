@@ -197,7 +197,7 @@ AQG:RegisterEvent("GOSSIP_SHOW", function()
     local questOptions    = {}
 
     for i, option in ipairs(options) do
-        hasCinematicOption = IsCinematicOption(option)
+        hasCinematicOption = hasCinematicOption or IsCinematicOption(option)
 
         if not hasSkip and AQG:IsSkipOption(option) then
             hasSkip = true

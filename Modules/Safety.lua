@@ -75,6 +75,20 @@ function Safety:SafeNumber(value)
     return nil
 end
 
+function Safety:IsSafeBoolean(value)
+    if self:IsSecret(value) then return false end
+
+    return type(value) == "boolean"
+end
+
+function Safety:SafeBoolean(value, fallback)
+    if self:IsSafeBoolean(value) then
+        return value
+    end
+
+    return fallback
+end
+
 function Safety:IsSafeString(value)
     if self:IsSecret(value) then return false end
 
