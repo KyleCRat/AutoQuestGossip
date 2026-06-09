@@ -13,5 +13,6 @@ Modules\Safety.lua
 Modules\InteractionContext.lua
 Modules\Quest\QuestDecisions.lua
 Modules\Quest\Quest.lua
-Modules\Gossip.lua
+Modules\Gossip\GossipDecisions.lua
+Modules\Gossip\Gossip.lua
 Settings.lua

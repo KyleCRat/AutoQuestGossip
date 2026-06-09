@@ -197,6 +197,7 @@ local function AddGossipAggregates(gossip, option)
     if option.isAngleBracket then gossip.hasAngleBracket = true end
     if option.isStayAwhile then gossip.hasStayAwhile = true end
     if option.isCinematic then gossip.hasCinematic = true end
+    if option.isDelve then gossip.hasDelve = true end
     if option.hasUnknownIcon then gossip.hasUnknownIcon = true end
     if option.isBlockedIcon then gossip.hasBlockedIcon = true end
     if option.isQuest then gossip.hasQuestOption = true end
@@ -212,6 +213,7 @@ local function BuildGossipContext()
         hasAngleBracket = false,
         hasStayAwhile = false,
         hasCinematic = false,
+        hasDelve = false,
         hasUnknownIcon = false,
         hasBlockedIcon = false,
         hasQuestOption = false,
@@ -460,6 +462,7 @@ function Context:Debug(context)
     AQG:Debug("Gossip summary:", gossip.optionCount or 0,
         "unsafe:", gossip.unsafeOptionCount or 0,
         "cinematic:", tostring(gossip.hasCinematic),
+        "delve:", tostring(gossip.hasDelve),
         "unknownIcon:", tostring(gossip.hasUnknownIcon))
     AQG:Debug("Quest summary: active:", #(quests.active or {}),
         "available:", #(quests.available or {}),
