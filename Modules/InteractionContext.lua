@@ -309,6 +309,124 @@ local function BuildQuestContext()
 end
 
 --------------------------------------------------------------------------------
+-- Debug Formatting
+--------------------------------------------------------------------------------
+
+local function DebugValue(value)
+    if Safety:IsSecret(value) then
+        return "<secret>"
+    end
+
+    if value == nil then
+        return "nil"
+    end
+
+    return tostring(value)
+end
+
+local function JoinTags(tags)
+    if #tags == 0 then
+        return ""
+    end
+
+    return " [" .. table.concat(tags, "] [") .. "]"
+end
+
+local function UnsafeReasonsText(entry)
+    local reasons = entry and entry.unsafeReasons
+
+    if type(reasons) ~= "table" or #reasons == 0 then
+        return nil
+    end
+
+    return table.concat(reasons, ", ")
+end
+
+local function GossipOptionTags(option)
+    local tags = {}
+
+    if not option.safe then table.insert(tags, "UNSAFE") end
+    if not option.hasOptionID then table.insert(tags, "nil ID") end
+    if option.isQuest then table.insert(tags, "QUEST") end
+    if option.isCinematic then table.insert(tags, "CINEMATIC") end
+    if option.selectOptionWhenOnlyOption then table.insert(tags, "AUTO-SELECT") end
+    if option.isSkip then table.insert(tags, "SKIP") end
+    if option.isImportant then table.insert(tags, "IMPORTANT") end
+    if option.isDelve then table.insert(tags, "DELVE") end
+    if option.isAngleBracket then table.insert(tags, "ANGLE-BRACKET") end
+    if option.isStayAwhile then table.insert(tags, "STAY-AWHILE") end
+    if option.isVendor then table.insert(tags, "VENDOR") end
+    if option.isBlockedIcon then table.insert(tags, "BLOCKED ICON") end
+    if option.hasUnknownIcon then table.insert(tags, "UNKNOWN ICON") end
+
+    return tags
+end
+
+local function QuestTags(quest)
+    local tags = {}
+
+    if not quest.safe then table.insert(tags, "UNSAFE") end
+    if quest.isComplete then table.insert(tags, "COMPLETE") end
+    if quest.isTrivial then table.insert(tags, "TRIVIAL") end
+    if quest.repeatable then table.insert(tags, "REPEATABLE") end
+    if quest.isImportant then table.insert(tags, "IMPORTANT") end
+    if quest.isIgnored then table.insert(tags, "IGNORED") end
+    if quest.isLegendary then table.insert(tags, "LEGENDARY") end
+    if quest.isMeta then table.insert(tags, "META") end
+
+    return tags
+end
+
+local function DebugGossipOptions(gossip)
+    if not gossip or gossip.optionCount == 0 then
+        AQG:Debug("Gossip options: none")
+        return
+    end
+
+    AQG:Debug("Gossip options:")
+
+    for _, option in ipairs(gossip.options) do
+        AQG:Debug("  " .. DebugValue(option.index) .. ". " ..
+            DebugValue(option.name) ..
+            " (ID: " .. DebugValue(option.optionID) ..
+            ", iconID: " .. DebugValue(option.icon) ..
+            ", overrideIconID: " .. DebugValue(option.overrideIconID) ..
+            ", flags: " .. DebugValue(option.flags) ..
+            ", status: " .. DebugValue(option.status) .. ")" ..
+            JoinTags(GossipOptionTags(option)))
+
+        local unsafeReasons = UnsafeReasonsText(option)
+        if unsafeReasons then
+            AQG:Debug("    unsafe:", unsafeReasons)
+        end
+    end
+end
+
+local function DebugQuestList(label, quests)
+    if not quests or #quests == 0 then
+        AQG:Debug(label .. ": none")
+        return
+    end
+
+    AQG:Debug(label .. ":")
+
+    for _, quest in ipairs(quests) do
+        AQG:Debug("  " .. DebugValue(quest.index) .. ". " ..
+            DebugValue(quest.title) ..
+            " (ID: " .. DebugValue(quest.questID) ..
+            ", level: " .. DebugValue(quest.questLevel) ..
+            ", frequency: " .. DebugValue(quest.frequency) ..
+            ", questInfoID: " .. DebugValue(quest.questInfoID) .. ")" ..
+            JoinTags(QuestTags(quest)))
+
+        local unsafeReasons = UnsafeReasonsText(quest)
+        if unsafeReasons then
+            AQG:Debug("    unsafe:", unsafeReasons)
+        end
+    end
+end
+
+--------------------------------------------------------------------------------
 -- Main Driver
 --------------------------------------------------------------------------------
 
@@ -335,16 +453,41 @@ function Context:Debug(context)
     local gossip = context.gossip or {}
     local quests = context.quests or {}
 
-    AQG:Debug("Interaction context:", context.event or "UNKNOWN")
-    AQG:Debug("  NPC:", npc.name or UNKNOWN_VALUE,
-        "(ID:", npc.id or UNKNOWN_VALUE, ")",
-        npc.safe and "safe" or "unsafe")
-    AQG:Debug("  Gossip options:", gossip.optionCount or 0,
+    AQG:DebugSeparator((context.event or "UNKNOWN") .. " (Context)")
+    AQG:Debug("NPC safety:", npc.safe and "safe" or "unsafe",
+        npc.blocked and "blocked" or "not blocked",
+        npc.blockReason or "")
+    AQG:Debug("Gossip summary:", gossip.optionCount or 0,
         "unsafe:", gossip.unsafeOptionCount or 0,
         "cinematic:", tostring(gossip.hasCinematic),
         "unknownIcon:", tostring(gossip.hasUnknownIcon))
-    AQG:Debug("  Quests active:", #(quests.active or {}),
+    AQG:Debug("Quest summary: active:", #(quests.active or {}),
         "available:", #(quests.available or {}),
         "completable:", tostring(quests.hasCompletable),
         "unsafe:", quests.unsafeQuestCount or 0)
+    DebugQuestList("Active quests", quests.active)
+    DebugQuestList("Available quests", quests.available)
+    DebugGossipOptions(gossip)
 end
+
+--------------------------------------------------------------------------------
+-- Passive Debug Event Observer
+--------------------------------------------------------------------------------
+
+local function DebugCurrentInteraction(eventName)
+    if not AutoQuestGossipDB or not AutoQuestGossipDB.debugEnabled then
+        return
+    end
+
+    AQG:PanelScrollToBottom()
+
+    Context:Debug(Context:Build(eventName))
+end
+
+AQG:RegisterEvent("GOSSIP_SHOW", function()
+    DebugCurrentInteraction("GOSSIP_SHOW")
+end)
+
+AQG:RegisterEvent("GOSSIP_OPTIONS_REFRESHED", function()
+    DebugCurrentInteraction("GOSSIP_OPTIONS_REFRESHED")
+end)

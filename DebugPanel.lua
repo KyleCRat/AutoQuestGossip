@@ -141,6 +141,14 @@ function AQG:PanelClear()
     scrollFrame:SetVerticalScroll(0)
 end
 
+function AQG:PanelScrollToBottom()
+    scrollPos = 0
+
+    C_Timer.After(0, function()
+        UpdateScroll()
+    end)
+end
+
 function AQG:ShowPanel(anchorFrame)
     if detached then return end
     if not anchorFrame then return end
