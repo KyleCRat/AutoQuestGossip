@@ -215,6 +215,9 @@ function Safety:AddDecisionWarning(decision, warning)
 
     if not decision.warnings then decision.warnings = {} end
     AddListValue(decision.warnings, warning)
+    if warning and not decision.warnText then
+        decision.warnText = warning
+    end
 
     return decision
 end
@@ -242,6 +245,49 @@ function Safety:DebugDecision(domain, decision)
 
     AQG:Debug("  blockers:", ListToString(decision.blockers))
     AQG:Debug("  warnings:", ListToString(decision.warnings))
+end
+
+function Safety:DebugDecisionEvent(eventName, domain, decision, detailsFunc)
+    if not AutoQuestGossipDB or not AutoQuestGossipDB.debugEnabled then
+        return
+    end
+
+    AQG:DebugSeparator(eventName)
+    self:DebugDecision(domain, decision)
+
+    if detailsFunc then
+        detailsFunc(decision)
+    end
+end
+
+function Safety:DebugDecisionExecution(domain, decision, label)
+    if not AutoQuestGossipDB or not AutoQuestGossipDB.debugEnabled then
+        return
+    end
+
+    if not decision then
+        AQG:Debug(domain or "Decision", "execute: no decision")
+        return
+    end
+
+    AQG:Debug(domain or "Decision", "execute:",
+        "action:", decision.action or "none",
+        "target:", decision.targetID and SafeDebugValue(decision.targetID) or "none",
+        "label:", label or "none")
+end
+
+function Safety:DebugRevalidationFailed(reason)
+    if not AutoQuestGossipDB or not AutoQuestGossipDB.debugEnabled then
+        return
+    end
+
+    AQG:Debug("-> Revalidation failed:", reason or "unknown")
+end
+
+function Safety:WarnDecision(decision)
+    if decision and decision.warnText then
+        AQG:Warn(decision.warnText)
+    end
 end
 
 --------------------------------------------------------------------------------

@@ -31,9 +31,7 @@ local function NoAction(reason)
 end
 
 local function WithWarning(decision, warning)
-    decision.warnText = warning
-
-    return decision
+    return Safety:AddDecisionWarning(decision, warning)
 end
 
 local function OptionLabel(option)

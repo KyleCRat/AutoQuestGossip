@@ -32,23 +32,19 @@ local function OptionLabel(decision)
     return IconTag(decision) .. Safety:SafeString(decision.label, "?")
 end
 
-local function DebugDecision(eventName, decision)
-    if not AutoQuestGossipDB or not AutoQuestGossipDB.debugEnabled then
-        return
-    end
-
-    AQG:DebugSeparator(eventName)
-    Safety:DebugDecision("Gossip", decision)
-
+local function DebugGossipDecisionDetails(decision)
     if decision and decision.option then
         AQG:Debug("  option:", OptionLabel(decision))
     end
 end
 
-local function WarnDecision(decision)
-    if decision and decision.warnText then
-        AQG:Warn(decision.warnText)
-    end
+local function DebugDecision(eventName, decision)
+    Safety:DebugDecisionEvent(
+        eventName,
+        "Gossip",
+        decision,
+        DebugGossipDecisionDetails
+    )
 end
 
 local function MakeGossipResult(decision, executed)
@@ -60,7 +56,7 @@ local function MakeGossipResult(decision, executed)
 end
 
 local function DebugRevalidationFailed(reason)
-    AQG:Debug("-> Revalidation failed:", reason or "unknown")
+    Safety:DebugRevalidationFailed(reason)
 end
 
 --------------------------------------------------------------------------------
@@ -69,7 +65,7 @@ end
 
 local function CanExecuteDecision(decision)
     if not decision or not decision.allowed then
-        WarnDecision(decision)
+        Safety:WarnDecision(decision)
         return false
     end
 
@@ -158,7 +154,7 @@ local function ExecuteGossipDecision(decision)
     end
 
     if selectedGossipKeys[loopKey] then
-        AQG:Debug("-> Loop detected. Would NOT auto-select gossip.")
+        Safety:DebugRevalidationFailed("gossip loop detected")
         AQG:Warn("Gossip loop detected - automation paused.")
 
         return false
@@ -168,7 +164,11 @@ local function ExecuteGossipDecision(decision)
 
     AQG:Verbose("Gossip:", OptionLabel(currentDecision),
         "(ID:", currentDecision.optionID or "?", ")")
-    AQG:Debug("Auto-select gossip:", OptionLabel(currentDecision))
+    Safety:DebugDecisionExecution(
+        "Gossip",
+        currentDecision,
+        OptionLabel(currentDecision)
+    )
 
     if currentDecision.action == ACTIONS.SELECT_BLIZZARD_AUTO then
         SelectOptionByIndex(currentDecision.orderIndex)

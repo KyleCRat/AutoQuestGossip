@@ -14,28 +14,24 @@ local GetLogIndexForQuestID = C_QuestLog.GetLogIndexForQuestID
 -- Debug And Execution Guards
 --------------------------------------------------------------------------------
 
-local function DebugDecision(eventName, decision)
-    if not AutoQuestGossipDB or not AutoQuestGossipDB.debugEnabled then
-        return
-    end
-
-    AQG:DebugSeparator(eventName)
-    Safety:DebugDecision("Quest", decision)
-
+local function DebugQuestDecisionDetails(decision)
     if decision and Decisions:IsSafeQuestID(decision.targetID) then
         AQG:DebugQuestAPIs(decision.targetID)
     end
 end
 
-local function WarnDecision(decision)
-    if decision and decision.warnText then
-        AQG:Warn(decision.warnText)
-    end
+local function DebugDecision(eventName, decision)
+    Safety:DebugDecisionEvent(
+        eventName,
+        "Quest",
+        decision,
+        DebugQuestDecisionDetails
+    )
 end
 
 local function CanExecuteDecision(decision)
     if not decision or not decision.allowed then
-        WarnDecision(decision)
+        Safety:WarnDecision(decision)
         return false
     end
 
@@ -51,11 +47,15 @@ local function CanExecuteDecision(decision)
 end
 
 local function DebugRevalidationFailed(reason)
-    AQG:Debug("-> Revalidation failed:", reason or "unknown")
+    Safety:DebugRevalidationFailed(reason)
 end
 
 local function QuestLabel(decision)
     return decision and decision.label or "?"
+end
+
+local function DebugExecution(decision)
+    Safety:DebugDecisionExecution("Quest", decision, QuestLabel(decision))
 end
 
 local function MakeGossipQuestResult(decision, executed, pending)
@@ -192,7 +192,7 @@ local function ExecuteGossipQuestDecision(decision)
         end
 
         AQG:Verbose("Turn-in:", QuestLabel(decision))
-        AQG:Debug("Auto turn-in:", QuestLabel(decision))
+        DebugExecution(decision)
         C_GossipInfo.SelectActiveQuest(decision.targetID)
 
         return true
@@ -212,7 +212,7 @@ local function ExecuteGossipQuestDecision(decision)
         end
 
         AQG:Verbose("Accept:", QuestLabel(decision))
-        AQG:Debug("Auto-accept:", QuestLabel(decision))
+        DebugExecution(decision)
         C_GossipInfo.SelectAvailableQuest(decision.targetID)
 
         return true
@@ -285,7 +285,7 @@ local function ExecuteQuestGreetingDecision(decision)
         end
 
         AQG:Verbose("Turn-in:", QuestLabel(decision))
-        AQG:Debug("Auto turn-in:", QuestLabel(decision))
+        DebugExecution(decision)
         SelectActiveQuest(decision.index)
 
         return true
@@ -299,7 +299,7 @@ local function ExecuteQuestGreetingDecision(decision)
         end
 
         AQG:Verbose("Accept:", QuestLabel(decision))
-        AQG:Debug("Auto-accept:", QuestLabel(decision))
+        DebugExecution(decision)
         SelectAvailableQuest(decision.index)
 
         return true
@@ -332,7 +332,7 @@ local function ExecuteQuestAcceptConfirmDecision(decision)
     end
 
     AQG:Verbose("Confirm:", QuestLabel(decision))
-    AQG:Debug("Auto-confirm shared quest:", QuestLabel(decision))
+    DebugExecution(decision)
     ConfirmAcceptQuest()
 
     return true
@@ -381,7 +381,7 @@ local function ExecuteQuestDetailDecision(decision)
     end
 
     AQG:Verbose("Accept:", QuestLabel(decision))
-    AQG:Debug("Auto-accept:", QuestLabel(decision))
+    DebugExecution(decision)
 
     if autoAccept then
         AcknowledgeAutoAcceptQuest()
@@ -445,7 +445,7 @@ local function ExecuteQuestProgressDecision(decision)
     end
 
     AQG:Verbose("Turn-in:", QuestLabel(decision))
-    AQG:Debug("Auto turn-in (progress):", QuestLabel(decision))
+    DebugExecution(decision)
     CompleteQuest()
 
     return true
@@ -488,7 +488,7 @@ local function ExecuteQuestCompleteDecision(decision)
     end
 
     AQG:Verbose("Complete:", QuestLabel(decision))
-    AQG:Debug("Auto turn-in (complete):", QuestLabel(decision))
+    DebugExecution(decision)
     GetQuestReward(numChoices)
 
     return true
@@ -528,7 +528,7 @@ local function ExecuteQuestAutocompleteDecision(decision)
     end
 
     AQG:Verbose("Auto-complete:", QuestLabel(decision))
-    AQG:Debug("Auto-complete (tracker):", QuestLabel(decision))
+    DebugExecution(decision)
     SetSelectedQuest(decision.targetID)
     ShowQuestComplete(decision.targetID)
 
