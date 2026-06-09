@@ -15,4 +15,5 @@ Modules\Quest\QuestDecisions.lua
 Modules\Quest\Quest.lua
 Modules\Gossip\GossipDecisions.lua
 Modules\Gossip\Gossip.lua
+Modules\InteractionCoordinator.lua
 Settings.lua

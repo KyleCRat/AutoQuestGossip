@@ -76,9 +76,6 @@ local defaults = {
     devMode = false,
 }
 
--- Shared addon table
-AQG.questHandled = false -- flag to prevent gossip firing after quest selection
-
 local function IsModifierDown()
     local key = AutoQuestGossipDB.modifierKey
 

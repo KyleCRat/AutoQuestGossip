@@ -1,5 +1,7 @@
 local _, AQG = ...
 
+AQG.Quest = AQG.Quest or {}
+local Quest = AQG.Quest
 local Decisions = AQG.QuestDecisions
 local Safety = AQG.Safety
 local ACTIONS = Decisions.Actions
@@ -54,6 +56,15 @@ end
 
 local function QuestLabel(decision)
     return decision and decision.label or "?"
+end
+
+local function MakeGossipQuestResult(decision, executed, pending)
+    return {
+        decision = decision,
+        executed = executed and true or false,
+        pending = pending and true or false,
+        selected = decision and decision.allowed or false,
+    }
 end
 
 --------------------------------------------------------------------------------
@@ -528,15 +539,12 @@ end
 -- Event Handlers
 --------------------------------------------------------------------------------
 
-local function OnGossipShow()
-    AQG.questHandled = false
-
-    local context = AQG.InteractionContext:Build("GOSSIP_SHOW")
-    local quests = context.quests or {}
+function Quest:HandleGossipShow(context, retryFunc)
+    local quests = context and context.quests or {}
     local activeQuests = quests.active or {}
     local availableQuests = quests.available or {}
-    local gossip = context.gossip or {}
-    local npc = context.npc or {}
+    local gossip = context and context.gossip or {}
+    local npc = context and context.npc or {}
     local shouldWaitForCache =
         AutoQuestGossipDB and
         AutoQuestGossipDB.questEnabled and
@@ -548,25 +556,25 @@ local function OnGossipShow()
         not ((gossip.unsafeOptionCount or 0) > 0)
 
     if shouldWaitForCache then
-        if not Decisions:AreContextQuestsCached(activeQuests, OnGossipShow) then
-            return
+        if not Decisions:AreContextQuestsCached(activeQuests, retryFunc) then
+            return MakeGossipQuestResult(nil, false, true)
         end
 
         if not quests.hasCompletable and
-           not Decisions:AreContextQuestsCached(availableQuests, OnGossipShow) then
-            return
+           not Decisions:AreContextQuestsCached(availableQuests, retryFunc) then
+            return MakeGossipQuestResult(nil, false, true)
         end
     end
 
     local decision = Decisions:DecideGossipQuestAction(context)
     DebugDecision("GOSSIP_SHOW (Quest)", decision)
 
-    if ExecuteGossipQuestDecision(decision) then
-        AQG.questHandled = true
-    end
+    return MakeGossipQuestResult(
+        decision,
+        ExecuteGossipQuestDecision(decision),
+        false
+    )
 end
-
-AQG:RegisterEvent("GOSSIP_SHOW", OnGossipShow)
 
 local function OnQuestGreeting()
     local decision = Decisions:DecideQuestGreetingAction()

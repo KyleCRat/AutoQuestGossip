@@ -172,10 +172,6 @@ local function CheckCommonBlockers(context)
         return Block("gossip automation disabled", "gossip disabled")
     end
 
-    if AQG.questHandled then
-        return NoAction("quest action already handled this gossip event")
-    end
-
     local npc = context and context.npc
     if not npc or not npc.safe then
         return Block("NPC identity unavailable or secret", "npc identity secret")

@@ -1,5 +1,7 @@
 local _, AQG = ...
 
+AQG.Gossip = AQG.Gossip or {}
+local Gossip = AQG.Gossip
 local Decisions = AQG.GossipDecisions
 local Safety = AQG.Safety
 local ACTIONS = Decisions.Actions
@@ -47,6 +49,14 @@ local function WarnDecision(decision)
     if decision and decision.warnText then
         AQG:Warn(decision.warnText)
     end
+end
+
+local function MakeGossipResult(decision, executed)
+    return {
+        decision = decision,
+        executed = executed and true or false,
+        selected = decision and decision.allowed or false,
+    }
 end
 
 local function DebugRevalidationFailed(reason)
@@ -173,15 +183,12 @@ end
 -- Event Handlers
 --------------------------------------------------------------------------------
 
-local function OnGossipShow()
-    local context = AQG.InteractionContext:Build("GOSSIP_SHOW")
+function Gossip:HandleGossipShow(context)
     local decision = Decisions:DecideGossipAction(context)
 
     DebugDecision("GOSSIP_SHOW (Gossip)", decision)
-    ExecuteGossipDecision(decision)
+    return MakeGossipResult(decision, ExecuteGossipDecision(decision))
 end
-
-AQG:RegisterEvent("GOSSIP_SHOW", OnGossipShow)
 
 AQG:RegisterEvent("GOSSIP_CLOSED", function()
     wipe(selectedGossipKeys)
