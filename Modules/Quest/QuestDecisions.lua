@@ -82,7 +82,11 @@ end
 local function SafeQuestID(value)
     local questID = Safety:RequireNumber(value, "quest ID")
 
-    return questID and questID ~= 0
+    if not questID or questID == 0 then
+        return nil
+    end
+
+    return questID
 end
 
 local function DebugValue(value)
@@ -94,7 +98,7 @@ local function DebugValue(value)
 end
 
 function Decisions:IsSafeQuestID(value)
-    return SafeQuestID(value)
+    return SafeQuestID(value) ~= nil
 end
 
 function Decisions:ClassifyQuest(questOrID)
