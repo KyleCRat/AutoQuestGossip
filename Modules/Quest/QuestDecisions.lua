@@ -13,7 +13,7 @@ local GetQuestTagInfo = C_QuestLog.GetQuestTagInfo
 local IsQuestTrivial = C_QuestLog.IsQuestTrivial
 
 local RETRY_TIME_DELAY = 0.25
-local MAX_QUEST_DATA_RETRIES = 5
+local MAX_QUEST_DATA_RETRIES = 10
 local questDataRetryCounts = {}
 
 local ACTIONS = {
