@@ -75,6 +75,38 @@ function Safety:SafeNumber(value)
     return nil
 end
 
+function Safety:RequireNumber(value, fieldName)
+    if self:IsSecret(value) then
+        return nil, (fieldName or "value") .. " is secret"
+    end
+
+    if value == nil then
+        return nil, (fieldName or "value") .. " is missing"
+    end
+
+    if type(value) ~= "number" then
+        return nil, (fieldName or "value") .. " is not a number"
+    end
+
+    return value, nil
+end
+
+function Safety:OptionalNumber(value, fieldName)
+    if self:IsSecret(value) then
+        return nil, (fieldName or "value") .. " is secret"
+    end
+
+    if value == nil then
+        return nil, nil
+    end
+
+    if type(value) ~= "number" then
+        return nil, (fieldName or "value") .. " is not a number"
+    end
+
+    return value, nil
+end
+
 function Safety:IsSafeBoolean(value)
     if self:IsSecret(value) then return false end
 
@@ -89,6 +121,28 @@ function Safety:SafeBoolean(value, fallback)
     return fallback
 end
 
+function Safety:OptionalBoolean(value, fieldName, fallback)
+    if self:IsSecret(value) then
+        return fallback, (fieldName or "value") .. " is secret"
+    end
+
+    if value == nil then
+        return fallback, nil
+    end
+
+    if type(value) ~= "boolean" then
+        return fallback, (fieldName or "value") .. " is not a boolean"
+    end
+
+    return value, nil
+end
+
+function Safety:IsTrue(value)
+    if self:IsSecret(value) then return false end
+
+    return value == true
+end
+
 function Safety:IsSafeString(value)
     if self:IsSecret(value) then return false end
 
@@ -101,6 +155,22 @@ function Safety:SafeString(value, fallback)
     end
 
     return fallback
+end
+
+function Safety:OptionalString(value, fieldName, fallback)
+    if self:IsSecret(value) then
+        return fallback, (fieldName or "value") .. " is secret"
+    end
+
+    if value == nil then
+        return fallback, nil
+    end
+
+    if type(value) ~= "string" then
+        return fallback, (fieldName or "value") .. " is not a string"
+    end
+
+    return value, nil
 end
 
 --------------------------------------------------------------------------------
@@ -193,7 +263,11 @@ end
 function Safety:IsNPCSecret()
     local guid = UnitGUID("npc")
 
-    return not guid or self:IsSecret(guid)
+    if self:IsSecret(guid) then
+        return true
+    end
+
+    return not guid
 end
 
 -- Main driver for NPC identity. Callers that need both identity and blocklist
@@ -202,7 +276,7 @@ function Safety:BuildNPCContext(unit)
     unit = unit or "npc"
 
     local guid = UnitGUID(unit)
-    if not guid or self:IsSecret(guid) or type(guid) ~= "string" then
+    if self:IsSecret(guid) or not guid or type(guid) ~= "string" then
         return {
             safe = false,
             guid = nil,
@@ -278,9 +352,17 @@ function Safety:ValidateCurrentQuest(questID, frameName)
     end
 
     local currentQuestID = GetQuestID and GetQuestID()
-    if currentQuestID and currentQuestID ~= 0 then
-        if self:IsSecret(currentQuestID) then
-            return false, "current quest ID is secret"
+    if self:IsSecret(currentQuestID) then
+        return false, "current quest ID is secret"
+    end
+
+    if currentQuestID ~= nil then
+        if type(currentQuestID) ~= "number" then
+            return false, "current quest ID is invalid"
+        end
+
+        if currentQuestID == 0 then
+            return true
         end
 
         if currentQuestID ~= questID then
