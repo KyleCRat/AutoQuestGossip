@@ -62,7 +62,7 @@ end
 function AQG:PausedByModKey(module_name)
     if IsModifierDown() then
         self:Debug("|cffff4444->", "["..module_name.."] Modifier key held",
-                   " - automation paused.|r")
+                   " - AQG pause active.|r")
         return true
     end
 
@@ -126,10 +126,8 @@ function AQG:DebugSeparator(event)
 
     -- Ensure panel is visible (fallback if OnShow hook missed)
     if self.ShowPanel then
-        local anchor =
-            (DUIQuestFrame and DUIQuestFrame:IsShown() and DUIQuestFrame)
-            or (GossipFrame and GossipFrame:IsShown() and GossipFrame)
-            or (QuestFrame and QuestFrame:IsShown() and QuestFrame)
+        local anchor = self.GetInteractionAnchorFrame and
+            self:GetInteractionAnchorFrame()
 
         if anchor then self:ShowPanel(anchor) end
     end

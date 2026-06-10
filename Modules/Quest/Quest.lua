@@ -73,11 +73,11 @@ local function RevalidateDecision(decision, decideFunc)
 
     if not currentDecision or not currentDecision.allowed then
         return nil, currentDecision and currentDecision.reason
-            or "quest decision is no longer allowed"
+            or "Could not confirm the quest action before acting."
     end
 
     if not SameQuestDecision(decision, currentDecision) then
-        return nil, "quest decision changed"
+        return nil, "The quest action changed before acting."
     end
 
     return currentDecision, nil
@@ -115,7 +115,7 @@ local function ReadCurrentGoldCost()
     local value = GetQuestMoneyToGet and GetQuestMoneyToGet() or 0
 
     if not Safety:IsSafeNumber(value) then
-        return nil, "quest gold cost is unsafe"
+        return nil, "Cannot safely read the quest gold cost."
     end
 
     return value, nil
@@ -125,7 +125,7 @@ local function ReadCurrentRewardChoiceCount()
     local value = GetNumQuestChoices and GetNumQuestChoices() or 0
 
     if not Safety:IsSafeNumber(value) then
-        return nil, "reward choice count is unsafe"
+        return nil, "Cannot safely read the reward choice count."
     end
 
     return value, nil
@@ -135,7 +135,7 @@ local function ReadCurrentCompletable()
     local value = IsQuestCompletable and IsQuestCompletable()
 
     if Safety:IsSecret(value) then
-        return nil, "quest completable flag is secret"
+        return nil, "Cannot safely check whether this quest is complete."
     end
 
     return value and true or false, nil
@@ -145,7 +145,7 @@ local function ReadCurrentPvPFlag()
     local value = QuestFlagsPVP and QuestFlagsPVP()
 
     if Safety:IsSecret(value) then
-        return nil, "quest PvP flag is secret"
+        return nil, "Cannot safely check whether this quest flags you for PvP."
     end
 
     return value and true or false, nil
@@ -155,7 +155,7 @@ local function ReadCurrentAutoAcceptFlag()
     local value = QuestGetAutoAccept and QuestGetAutoAccept()
 
     if Safety:IsSecret(value) then
-        return nil, "quest auto-accept flag is secret"
+        return nil, "Cannot safely check this quest's auto-accept state."
     end
 
     return value and true or false, nil
@@ -165,7 +165,7 @@ local function ReadCurrentRequiresCurrency()
     local value = GetNumQuestCurrencies and GetNumQuestCurrencies() or 0
 
     if not Safety:IsSafeNumber(value) then
-        return nil, "required currency count is unsafe"
+        return nil, "Cannot safely read the required currency count."
     end
 
     return value > 0, nil
@@ -177,7 +177,7 @@ end
 
 local function FindCurrentGossipQuest(source, questID)
     if not Decisions:IsSafeQuestID(questID) then
-        return nil, "invalid quest ID"
+        return nil, "Cannot safely identify this quest."
     end
 
     local quests
@@ -225,12 +225,12 @@ local function ExecuteGossipQuestDecision(decision)
 
         local isComplete = currentQuest.isComplete
         if Safety:IsSecret(isComplete) or type(isComplete) ~= "boolean" then
-            DebugRevalidationFailed("quest complete flag is unsafe")
+            DebugRevalidationFailed("Cannot safely check whether this quest is complete.")
             return false
         end
 
         if not isComplete then
-            DebugRevalidationFailed("quest is no longer complete")
+            DebugRevalidationFailed("This quest is no longer complete.")
             return false
         end
 
@@ -238,7 +238,7 @@ local function ExecuteGossipQuestDecision(decision)
             Decisions:ShouldTurnIn(decision.quest or decision.targetID)
         if not shouldTurnIn then
             DebugRevalidationFailed(turnInReason
-                or "quest no longer passes turn-in filters")
+                or "This quest turn-in is blocked by your AQG settings.")
             return false
         end
 
@@ -261,7 +261,7 @@ local function ExecuteGossipQuestDecision(decision)
             Decisions:ShouldAccept(decision.quest or decision.targetID)
         if not shouldAccept then
             DebugRevalidationFailed(acceptReason
-                or "quest no longer passes accept filters")
+                or "This quest is blocked by your AQG settings.")
             return false
         end
 
@@ -282,28 +282,29 @@ end
 local function ValidateGreetingTurnIn(decision)
     local index = decision.index
     if not Safety:IsSafeNumber(index) then
-        return false, "quest greeting index is invalid"
+        return false, "Cannot safely identify this quest greeting option."
     end
 
     local currentQuestID = GetActiveQuestID and GetActiveQuestID(index)
     if not Safety:IsSafeNumber(currentQuestID) or
        currentQuestID ~= decision.targetID then
-        return false, "active quest changed"
+        return false, "The active quest changed before acting."
     end
 
     local _title, isComplete = GetActiveTitle(index)
     if Safety:IsSecret(isComplete) or type(isComplete) ~= "boolean" then
-        return false, "active quest complete flag is unsafe"
+        return false, "Cannot safely check whether the active quest is complete."
     end
 
     if not isComplete then
-        return false, "active quest is no longer complete"
+        return false, "The active quest is no longer complete."
     end
 
     local shouldTurnIn, turnInReason =
         Decisions:ShouldTurnIn(decision.quest or decision.targetID)
     if not shouldTurnIn then
-        return false, turnInReason or "quest no longer passes turn-in filters"
+        return false, turnInReason or
+            "This quest turn-in is blocked by your AQG settings."
     end
 
     return true, nil
@@ -312,19 +313,20 @@ end
 local function ValidateGreetingAccept(decision)
     local index = decision.index
     if not Safety:IsSafeNumber(index) then
-        return false, "quest greeting index is invalid"
+        return false, "Cannot safely identify this quest greeting option."
     end
 
     local _isTrivial, _frequency, _repeatable, _legendary, questID =
         GetAvailableQuestInfo(index)
     if not Safety:IsSafeNumber(questID) or questID ~= decision.targetID then
-        return false, "available quest changed"
+        return false, "The available quest changed before acting."
     end
 
     local shouldAccept, acceptReason =
         Decisions:ShouldAccept(decision.quest or decision.targetID)
     if not shouldAccept then
-        return false, acceptReason or "quest no longer passes accept filters"
+        return false, acceptReason or
+            "This quest is blocked by your AQG settings."
     end
 
     return true, nil
@@ -406,7 +408,7 @@ local function ExecuteQuestAcceptConfirmDecision(decision)
         Decisions:ShouldAccept(decision.quest or decision.targetID)
     if not shouldAccept then
         DebugRevalidationFailed(acceptReason
-            or "quest no longer passes accept filters")
+            or "This quest is blocked by your AQG settings.")
         return false
     end
 
@@ -441,7 +443,7 @@ local function ExecuteQuestDetailDecision(decision)
         return false
     end
     if isPvP then
-        DebugRevalidationFailed("PvP quest accept requires manual confirmation")
+        DebugRevalidationFailed("This quest would flag you for PvP and must be accepted manually.")
         return false
     end
 
@@ -451,7 +453,7 @@ local function ExecuteQuestDetailDecision(decision)
         return false
     end
     if goldCost > 0 then
-        DebugRevalidationFailed("quest now requires gold")
+        DebugRevalidationFailed("This quest now requires gold.")
         return false
     end
 
@@ -459,7 +461,7 @@ local function ExecuteQuestDetailDecision(decision)
         Decisions:ShouldAccept(decision.quest or decision.targetID)
     if not shouldAccept then
         DebugRevalidationFailed(acceptReason
-            or "quest no longer passes accept filters")
+            or "This quest is blocked by your AQG settings.")
         return false
     end
 
@@ -503,7 +505,7 @@ local function ExecuteQuestProgressDecision(decision)
         Decisions:ShouldTurnIn(decision.quest or decision.targetID)
     if not shouldTurnIn then
         DebugRevalidationFailed(turnInReason
-            or "quest no longer passes turn-in filters")
+            or "This quest turn-in is blocked by your AQG settings.")
         return false
     end
 
@@ -513,7 +515,7 @@ local function ExecuteQuestProgressDecision(decision)
         return false
     end
     if not completable then
-        DebugRevalidationFailed("quest is no longer completable")
+        DebugRevalidationFailed("This quest is no longer ready to turn in.")
         return false
     end
 
@@ -523,7 +525,7 @@ local function ExecuteQuestProgressDecision(decision)
         return false
     end
     if goldCost > 0 then
-        DebugRevalidationFailed("quest now requires gold")
+        DebugRevalidationFailed("This turn-in now requires gold.")
         return false
     end
 
@@ -533,7 +535,7 @@ local function ExecuteQuestProgressDecision(decision)
         return false
     end
     if requiresCurrency then
-        DebugRevalidationFailed("quest now requires currency")
+        DebugRevalidationFailed("This turn-in now requires currency.")
         return false
     end
 
@@ -573,7 +575,7 @@ local function ExecuteQuestCompleteDecision(decision)
         Decisions:ShouldTurnIn(decision.quest or decision.targetID)
     if not shouldTurnIn then
         DebugRevalidationFailed(turnInReason
-            or "quest no longer passes turn-in filters")
+            or "This quest turn-in is blocked by your AQG settings.")
         return false
     end
 
@@ -583,7 +585,7 @@ local function ExecuteQuestCompleteDecision(decision)
         return false
     end
     if goldCost > 0 then
-        DebugRevalidationFailed("quest now requires gold")
+        DebugRevalidationFailed("This turn-in now requires gold.")
         return false
     end
 
@@ -593,7 +595,7 @@ local function ExecuteQuestCompleteDecision(decision)
         return false
     end
     if numChoices > 1 then
-        DebugRevalidationFailed("quest now has multiple reward choices")
+        DebugRevalidationFailed("This quest now has multiple reward choices.")
         return false
     end
 
@@ -620,30 +622,30 @@ local function ExecuteQuestAutocompleteDecision(decision)
         Decisions:ShouldTurnIn(decision.quest or decision.targetID)
     if not shouldTurnIn then
         DebugRevalidationFailed(turnInReason
-            or "quest no longer passes turn-in filters")
+            or "This quest turn-in is blocked by your AQG settings.")
         return false
     end
 
     local index = GetLogIndexForQuestID(decision.targetID)
     if not Safety:IsSafeNumber(index) then
-        DebugRevalidationFailed("quest log entry is no longer available")
+        DebugRevalidationFailed("Cannot find this quest in your quest log.")
         return false
     end
 
     local info = GetInfo(index)
     if type(info) ~= "table" then
-        DebugRevalidationFailed("quest log info is no longer available")
+        DebugRevalidationFailed("Cannot read this quest from your quest log.")
         return false
     end
 
     local isAutoComplete = info.isAutoComplete
     if Safety:IsSecret(isAutoComplete) or type(isAutoComplete) ~= "boolean" then
-        DebugRevalidationFailed("autocomplete flag is unsafe")
+        DebugRevalidationFailed("Cannot safely check whether this quest can auto-complete.")
         return false
     end
 
     if not isAutoComplete then
-        DebugRevalidationFailed("quest is no longer auto-complete")
+        DebugRevalidationFailed("This quest can no longer auto-complete.")
         return false
     end
 

@@ -27,7 +27,9 @@ end
 
 local function RetryGossipShow(expectedContext)
     if not SameInteraction(expectedContext) then
-        Safety:DebugRevalidationFailed("gossip retry interaction changed")
+        Safety:DebugRevalidationFailed(
+            "The gossip interaction changed before it could finish."
+        )
         return nil
     end
 

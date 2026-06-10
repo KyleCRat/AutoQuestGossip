@@ -66,6 +66,10 @@ local function ForceGossip()
     local forceGossip, reason =
         Safety:OptionalBoolean(value, "force gossip", false)
 
+    if reason then
+        return nil, "Cannot safely read Blizzard's gossip state."
+    end
+
     return forceGossip, reason
 end
 
@@ -172,16 +176,19 @@ local function CheckCommonBlockers(context)
     local db = AutoQuestGossipDB
 
     if not db or not db.gossipEnabled then
-        return Block("gossip automation disabled", "gossip disabled")
+        return Block("Gossip automation is disabled in AQG settings.",
+            "gossip disabled")
     end
 
     local npc = context and context.npc
     if not npc or not npc.safe then
-        return Block("NPC identity unavailable or secret", "npc identity secret")
+        return Block("Cannot safely identify this NPC.",
+            "npc identity secret")
     end
 
     if npc.blocked then
-        return Block(npc.blockReason or "NPC is blocked", "blocked NPC")
+        return Block(npc.blockReason or
+            "This NPC is blocked by your blocklist.", "blocked NPC")
     end
 
     local gossip = context and context.gossip or {}
@@ -191,13 +198,14 @@ local function CheckCommonBlockers(context)
     end
 
     if (gossip.unsafeOptionCount or 0) > 0 then
-        return Block("gossip option data is unsafe", "unsafe gossip option")
+        return Block("Cannot safely read this gossip interaction.",
+            "unsafe gossip option")
     end
 
     if gossip.hasSkip then
         return WithWarning(
-            Block("skip option detected", "skip option"),
-            "Skip option detected - gossip paused."
+            Block("A skip option is available.", "skip option"),
+            "A skip option is available. Choose manually."
         )
     end
 
@@ -205,34 +213,39 @@ local function CheckCommonBlockers(context)
     if importantOption then
         return WithWarning(
             Block(
-                "important option detected: " .. OptionLabel(importantOption),
+                "An important option requires manual selection: " ..
+                    OptionLabel(importantOption),
                 "important option"
             ),
-            "Important selection detected - gossip paused."
+            "An important option is available. Choose manually."
         )
     end
 
     if gossip.hasAngleBracket and db.pauseOnAngleBracket then
         return WithWarning(
-            Block("angle bracket option detected", "angle bracket option"),
-            "Angle bracket option detected - gossip paused."
+            Block("A bracketed option is available.", "angle bracket option"),
+            "A bracketed option is available. Choose manually."
         )
     end
 
     if HasAvailableQuests(context) and not HasActiveQuests(context) then
-        return Block("NPC has available quests", "available quests")
+        return Block("This NPC has available quests. Choose manually.",
+            "available quests")
     end
 
     if gossip.hasCinematic then
-        return Block("NPC has a cinematic gossip option", "cinematic")
+        return Block("A cinematic gossip option is available. Choose manually.",
+            "cinematic")
     end
 
     if gossip.hasUnknownIcon then
-        return Block("unknown gossip icon detected", "unknown icon")
+        return Block("This NPC has an unknown gossip option. Choose manually.",
+            "unknown icon")
     end
 
     if db.gossipOnlySingle and (gossip.optionCount or 0) > 1 then
-        return Block("multiple gossip options with single-only mode", "multiple options")
+        return Block("Multiple gossip options are available in single-option mode.",
+            "multiple options")
     end
 
     return nil
@@ -350,7 +363,8 @@ function Decisions:DecideGossipAction(context)
     local questOptions = FindQuestOptions(options)
 
     if #questOptions > 1 then
-        return Block("multiple quest gossip options", "multiple quest options")
+        return Block("Multiple quest gossip options are available. Choose manually.",
+            "multiple quest options")
     end
 
     if #questOptions == 1 then
@@ -363,7 +377,8 @@ function Decisions:DecideGossipAction(context)
             )
         end
 
-        return Block("quest gossip option is not selectable", "blocked quest option")
+        return Block("Cannot safely select the quest gossip option.",
+            "blocked quest option")
     end
 
     local autoDecision = DecideBlizzardAutoSelect(context)
@@ -373,8 +388,8 @@ function Decisions:DecideGossipAction(context)
 
     if gossip.hasStayAwhile then
         return WithWarning(
-            Block("Stay Awhile option detected", "stay awhile"),
-            "Stay Awhile option detected - gossip paused."
+            Block("Stay Awhile and Listen is available.", "stay awhile"),
+            "Stay Awhile and Listen is available. Choose manually."
         )
     end
 
@@ -384,11 +399,13 @@ function Decisions:DecideGossipAction(context)
     end
 
     if not SafeFallbackGossipEnabled() then
-        return Block("safe fallback gossip disabled", "fallback disabled")
+        return Block("Fallback gossip selection is disabled in AQG settings.",
+            "fallback disabled")
     end
 
     if (gossip.optionCount or 0) > MAX_FALLBACK_OPTIONS then
-        return Block("too many gossip options for fallback", "too many options")
+        return Block("Too many gossip options are available for safe fallback selection.",
+            "too many options")
     end
 
     local fallbackOptions = FindFallbackOptions(options)
@@ -401,7 +418,8 @@ function Decisions:DecideGossipAction(context)
     end
 
     if #fallbackOptions > 1 then
-        return Block("multiple fallback gossip candidates", "ambiguous fallback")
+        return Block("Multiple safe fallback options are available. Choose manually.",
+            "ambiguous fallback")
     end
 
     return NoAction("no valid gossip option to auto-select")

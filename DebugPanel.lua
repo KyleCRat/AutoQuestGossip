@@ -4,12 +4,17 @@ local PANEL_WIDTH = 350
 local PANEL_HEIGHT_DETACHED = 500
 local FONT_PATH = "Interface\\AddOns\\AutoQuestGossip\\Media\\font\\JetBrainsMono-Regular.ttf"
 local FONT_SIZE = 9
+local PAUSE_FONT_SIZE = 12
 local PADDING = 8
 local BG_COLOR = { 0, 0, 0, 0.85 }
 local BORDER_COLOR = { 0, 0.8, 1, 0.6 }
+local PAUSE_COLOR = { 1, 0.15, 0.15, 1 }
+local PAUSE_FRAME_STRATA = "TOOLTIP"
 
 local detached = false -- true when opened via /aqg debug
 local lines = {}
+local pauseReason
+local TryHookFrames
 
 -- Create the main panel frame
 local panel = CreateFrame("Frame", "AQGDebugPanel", UIParent, "BackdropTemplate")
@@ -23,6 +28,25 @@ panel:SetBackdropColor(unpack(BG_COLOR))
 panel:SetBackdropBorderColor(unpack(BORDER_COLOR))
 panel:SetFrameStrata("HIGH")
 panel:Hide()
+
+-- User-facing pause reason shown below the active quest/gossip frame.
+local pauseFrame = CreateFrame("Frame", "AQGPauseIndicator", UIParent)
+pauseFrame:SetHeight(56)
+pauseFrame:SetFrameStrata(PAUSE_FRAME_STRATA)
+pauseFrame:SetToplevel(true)
+pauseFrame:Hide()
+
+local pauseText = pauseFrame:CreateFontString(nil, "OVERLAY")
+pauseText:SetDrawLayer("OVERLAY", 7)
+pauseText:SetFont(FONT_PATH, PAUSE_FONT_SIZE, "THICKOUTLINE")
+pauseText:SetTextColor(unpack(PAUSE_COLOR))
+pauseText:SetShadowColor(0, 0, 0, 1)
+pauseText:SetShadowOffset(2, -2)
+pauseText:SetJustifyH("CENTER")
+pauseText:SetJustifyV("TOP")
+pauseText:SetWordWrap(true)
+pauseText:SetPoint("TOPLEFT", pauseFrame, "TOPLEFT", PADDING, 0)
+pauseText:SetPoint("TOPRIGHT", pauseFrame, "TOPRIGHT", -PADDING, 0)
 
 -- Title bar
 local title = panel:CreateFontString(nil, "OVERLAY")
@@ -105,6 +129,89 @@ scrollFrame:SetScript("OnMouseWheel", function(_, delta)
 end)
 
 local MAX_LINES = 2000
+
+local function CurrentAnchorFrame()
+    return (DUIQuestFrame and DUIQuestFrame:IsShown() and DUIQuestFrame)
+        or (GossipFrame and GossipFrame:IsShown() and GossipFrame)
+        or (QuestFrame and QuestFrame:IsShown() and QuestFrame)
+end
+
+function AQG:GetInteractionAnchorFrame()
+    if TryHookFrames then
+        TryHookFrames()
+    end
+
+    return CurrentAnchorFrame()
+end
+
+local function AnchorPauseFrame(anchorFrame)
+    if not anchorFrame then return false end
+
+    local width = 420
+    if anchorFrame.GetWidth then
+        width = anchorFrame:GetWidth() or width
+    end
+
+    pauseFrame:SetParent(anchorFrame)
+    pauseFrame:SetWidth(width)
+    pauseFrame:ClearAllPoints()
+    pauseFrame:SetPoint("TOP", anchorFrame, "BOTTOM", 0, -8)
+    pauseFrame:SetFrameStrata(PAUSE_FRAME_STRATA)
+    pauseFrame:SetToplevel(true)
+
+    if anchorFrame.GetFrameLevel then
+        pauseFrame:SetFrameLevel((anchorFrame:GetFrameLevel() or 1) + 100)
+    end
+
+    -- Re-apply after re-parenting; nested FontStrings can lose font settings.
+    pauseText:SetFont(FONT_PATH, PAUSE_FONT_SIZE, "THICKOUTLINE")
+    pauseText:SetTextColor(unpack(PAUSE_COLOR))
+
+    return true
+end
+
+local function PauseDisplayText(reason)
+    return "AQG Paused: " .. reason
+end
+
+function AQG:ShowPauseReason(reason, anchorFrame)
+    if not reason or reason == "" then
+        if self.HidePauseReason then
+            self:HidePauseReason()
+        end
+        return
+    end
+
+    pauseReason = reason
+    if TryHookFrames then
+        TryHookFrames()
+    end
+
+    anchorFrame = anchorFrame or CurrentAnchorFrame()
+
+    if not AnchorPauseFrame(anchorFrame) then
+        return
+    end
+
+    pauseText:SetText(PauseDisplayText(reason))
+    pauseFrame:Show()
+end
+
+function AQG:RefreshPauseReason(anchorFrame)
+    if not pauseReason then return end
+
+    anchorFrame = anchorFrame or CurrentAnchorFrame()
+    if AnchorPauseFrame(anchorFrame) then
+        pauseText:SetText(PauseDisplayText(pauseReason))
+        pauseFrame:Show()
+    end
+end
+
+function AQG:HidePauseReason()
+    pauseReason = nil
+    pauseFrame:Hide()
+    pauseFrame:SetParent(UIParent)
+end
 
 function AQG:PanelPrint(text)
     table.insert(lines, text)
@@ -215,6 +322,10 @@ local function HookFrame(frame)
     framesHooked[frame] = true
 
     frame:HookScript("OnShow", function(self)
+        if AQG.RefreshPauseReason then
+            AQG:RefreshPauseReason(self)
+        end
+
         if AutoQuestGossipDB and AutoQuestGossipDB.debugEnabled then
             AQG:ShowPanel(self)
         end
@@ -222,16 +333,29 @@ local function HookFrame(frame)
 
     frame:HookScript("OnHide", function()
         AQG:HidePanel()
+        if AQG.HidePauseReason then
+            AQG:HidePauseReason()
+        end
     end)
 
     frame:HookScript("OnSizeChanged", function(self)
         if not detached and panel:IsShown() then
             panel:SetHeight(self:GetHeight())
         end
+
+        if AQG.RefreshPauseReason then
+            AQG:RefreshPauseReason(self)
+        end
     end)
 end
 
-local function TryHookFrames()
+local function ResetPauseReason()
+    if AQG.HidePauseReason then
+        AQG:HidePauseReason()
+    end
+end
+
+TryHookFrames = function()
     HookFrame(QuestFrame)
     HookFrame(GossipFrame)
     -- DialogueUI addon (YUI-Dialogue) replaces the quest/gossip frames with DUIQuestFrame
@@ -240,6 +364,14 @@ end
 
 -- Hook on init (frames may exist already)
 AQG:OnInit(TryHookFrames)
+
+AQG:RegisterEvent("GOSSIP_SHOW", ResetPauseReason)
+AQG:RegisterEvent("QUEST_GREETING", ResetPauseReason)
+AQG:RegisterEvent("QUEST_ACCEPT_CONFIRM", ResetPauseReason)
+AQG:RegisterEvent("QUEST_DETAIL", ResetPauseReason)
+AQG:RegisterEvent("QUEST_PROGRESS", ResetPauseReason)
+AQG:RegisterEvent("QUEST_COMPLETE", ResetPauseReason)
+AQG:RegisterEvent("QUEST_AUTOCOMPLETE", ResetPauseReason)
 
 -- Also try hooking when panel is shown (fallback for load-on-demand frames)
 local origShowPanel = AQG.ShowPanel

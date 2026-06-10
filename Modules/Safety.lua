@@ -137,6 +137,33 @@ local function ShouldSuppressDecisionDebug(signature)
     return lastPrinted and (now - lastPrinted) < DEBUG_DEDUPE_SECONDS
 end
 
+local function HasBlockers(decision)
+    return decision and type(decision.blockers) == "table" and
+        #decision.blockers > 0
+end
+
+local function UpdatePauseIndicator(decision, options)
+    local reason = decision and decision.pauseReason
+
+    if reason then
+        if AQG.ShowPauseReason then
+            AQG:ShowPauseReason(reason)
+        end
+        return
+    end
+
+    if decision and decision.allowed and AQG.HidePauseReason then
+        AQG:HidePauseReason()
+        return
+    end
+
+    if decision and not HasBlockers(decision) and
+       not (options and options.suppressInteractionHeader) and
+       AQG.HidePauseReason then
+        AQG:HidePauseReason()
+    end
+end
+
 --------------------------------------------------------------------------------
 -- Secret-Value And Primitive Guards
 --------------------------------------------------------------------------------
@@ -274,6 +301,7 @@ end
 
 function Safety:BlockDecision(reason, blockers)
     local decision = self:MakeDecision(false, nil, nil, reason)
+    decision.pauseReason = reason
 
     if type(blockers) == "table" then
         decision.blockers = CopyList(blockers)
@@ -301,6 +329,9 @@ function Safety:AddDecisionWarning(decision, warning)
     AddListValue(decision.warnings, warning)
     if warning and not decision.warnText then
         decision.warnText = warning
+    end
+    if warning then
+        decision.pauseReason = warning
     end
 
     return decision
@@ -339,6 +370,8 @@ function Safety:DebugDecision(domain, decision)
 end
 
 function Safety:DebugDecisionEvent(eventName, domain, decision, detailsFunc, options)
+    UpdatePauseIndicator(decision, options)
+
     if not AutoQuestGossipDB or not AutoQuestGossipDB.debugEnabled then
         return
     end
@@ -381,6 +414,9 @@ function Safety:DebugDecisionExecution(domain, decision, label)
 end
 
 function Safety:DebugRevalidationFailed(reason)
+    self:ShowRuntimePause(reason or
+        "Stopped because the interaction changed.")
+
     if not AutoQuestGossipDB or not AutoQuestGossipDB.debugEnabled then
         return
     end
@@ -390,6 +426,8 @@ function Safety:DebugRevalidationFailed(reason)
 end
 
 function Safety:WarnDecision(decision)
+    UpdatePauseIndicator(decision)
+
     if decision and decision.warnText then
         AQG:Warn(decision.warnText)
     end
@@ -400,11 +438,29 @@ end
 --------------------------------------------------------------------------------
 
 function Safety:CheckModifierPaused(moduleName)
-    return AQG:PausedByModKey(moduleName)
+    local paused = AQG:PausedByModKey(moduleName)
+
+    if paused and AQG.ShowPauseReason then
+        AQG:ShowPauseReason("Your pause modifier key is held.")
+    end
+
+    return paused
 end
 
 function Safety:CheckDevMode()
-    return AutoQuestGossipDB and AutoQuestGossipDB.devMode or false
+    local paused = AutoQuestGossipDB and AutoQuestGossipDB.devMode or false
+
+    if paused and AQG.ShowPauseReason then
+        AQG:ShowPauseReason("Dev mode is enabled.")
+    end
+
+    return paused
+end
+
+function Safety:ShowRuntimePause(reason)
+    if reason and AQG.ShowPauseReason then
+        AQG:ShowPauseReason(reason)
+    end
 end
 
 --------------------------------------------------------------------------------
@@ -434,7 +490,7 @@ function Safety:BuildNPCContext(unit)
             id = nil,
             name = UNKNOWN_VALUE,
             blocked = false,
-            blockReason = "NPC identity is unavailable or secret",
+            blockReason = "Cannot safely identify this NPC.",
         }
     end
 
@@ -477,7 +533,7 @@ function Safety:CheckNPCBlocklist(npcContext)
     local npcID = npcContext.id
     if self:IsSafeNumber(npcID) and
        AQG.BlockedNPCIDs and AQG.BlockedNPCIDs[npcID] then
-        return false, "blocked NPC ID"
+        return false, "This NPC is blocked by your blocklist."
     end
 
     local npcName = npcContext.name
@@ -485,7 +541,8 @@ function Safety:CheckNPCBlocklist(npcContext)
         for _, blockedName in ipairs(AQG.BlockedNPCNames) do
             if type(blockedName) == "string" and
                npcName:find(blockedName, 1, true) then
-                return false, "blocked NPC name: " .. blockedName
+                return false, "This NPC matches your blocked name: " ..
+                    blockedName .. "."
             end
         end
     end
@@ -499,32 +556,32 @@ end
 
 function Safety:ValidateCurrentQuest(questID, frameName)
     if not self:IsSafeNumber(questID) or questID == 0 then
-        return false, "invalid quest ID"
+        return false, "Cannot safely identify this quest."
     end
 
     local currentQuestID = GetQuestID and GetQuestID()
     if self:IsSecret(currentQuestID) then
-        return false, "current quest ID is secret"
+        return false, "Cannot safely identify the current quest."
     end
 
     if currentQuestID ~= nil then
         if type(currentQuestID) ~= "number" then
-            return false, "current quest ID is invalid"
+            return false, "Cannot safely identify the current quest."
         end
 
         if currentQuestID == 0 then
-            return false, "current quest is unavailable"
+            return false, "The current quest is no longer available."
         end
 
         if currentQuestID ~= questID then
-            return false, "current quest changed"
+            return false, "The current quest changed before acting."
         end
     end
 
     if frameName then
         local frame = _G[frameName]
         if frame and frame.IsShown and not frame:IsShown() then
-            return false, frameName .. " is hidden"
+            return false, "The quest frame closed before acting."
         end
     end
 
@@ -533,7 +590,7 @@ end
 
 function Safety:ValidateCurrentGossipOption(optionID)
     if not self:IsSafeNumber(optionID) then
-        return false, "invalid gossip option ID"
+        return false, "Cannot safely identify this gossip option."
     end
 
     local options = C_GossipInfo and C_GossipInfo.GetOptions and
@@ -548,7 +605,7 @@ function Safety:ValidateCurrentGossipOption(optionID)
         end
     end
 
-    return false, "gossip option is no longer available"
+    return false, "This gossip option is no longer available."
 end
 
 --------------------------------------------------------------------------------

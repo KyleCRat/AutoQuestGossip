@@ -51,6 +51,24 @@ local CONTENT_TAG_MAP = {
     [289] = "contentWorldBoss", -- World Boss
 }
 
+local SETTING_BLOCK_REASONS = {
+    contentDungeon = "Dungeon quests are blocked by your AQG settings.",
+    contentRaid = "Raid quests are blocked by your AQG settings.",
+    contentPvP = "PvP quests are blocked by your AQG settings.",
+    contentGroup = "Group quests are blocked by your AQG settings.",
+    contentDelve = "Delve quests are blocked by your AQG settings.",
+    contentWorldBoss = "World boss quests are blocked by your AQG settings.",
+    acceptDaily = "Daily quests are blocked by your AQG settings.",
+    acceptWeekly = "Weekly quests are blocked by your AQG settings.",
+    acceptTrivial = "Trivial quests are blocked by your AQG settings.",
+    acceptWarboundCompleted =
+        "Warbound completed quests are blocked by your AQG settings.",
+    acceptMeta = "Meta quests are blocked by your AQG settings.",
+    acceptRegular = "Regular quests are blocked by your AQG settings.",
+    questTurnInDelve =
+        "Delver's Call turn-ins are blocked by your AQG settings.",
+}
+
 local function RetryKey(prefix, questID)
     return prefix .. ":" .. tostring(questID)
 end
@@ -107,16 +125,17 @@ local function DebugValue(value)
     return tostring(value)
 end
 
-local function DisabledSettingReason(category, key)
-    return category .. " " .. key .. " is disabled in settings"
+local function DisabledSettingReason(key)
+    return SETTING_BLOCK_REASONS[key] or
+        "This quest is blocked by your AQG settings."
 end
 
-local function SettingAllowed(category, key, enabled)
+local function SettingAllowed(key, enabled)
     if enabled then
         return true, nil
     end
 
-    return false, DisabledSettingReason(category, key)
+    return false, DisabledSettingReason(key)
 end
 
 function Decisions:IsSafeQuestID(value)
@@ -192,14 +211,13 @@ end
 function Decisions:ShouldAllowContent(questID)
     questID = SafeQuestID(questID)
     if not questID then
-        return false, "quest ID is unsafe"
+        return false, "Cannot safely identify this quest."
     end
 
     local key = self:GetContentFilterKey(questID)
 
     if key then
         return SettingAllowed(
-            "content type",
             key,
             AutoQuestGossipDB and AutoQuestGossipDB[key]
         )
@@ -213,7 +231,7 @@ function Decisions:ShouldAccept(questOrID)
         and questOrID or { questID = questOrID }
 
     if not SafeQuestID(quest.questID) then
-        return false, "quest ID is unsafe"
+        return false, "Cannot safely identify this quest."
     end
 
     local allowed, reason = self:ShouldAllowContent(quest.questID)
@@ -222,13 +240,18 @@ function Decisions:ShouldAccept(questOrID)
     local db = AutoQuestGossipDB
     local daily, weekly, trivial, warbound, meta = self:ClassifyQuest(quest)
 
-    if     meta then return SettingAllowed("accept filter", "acceptMeta", db.acceptMeta) end
-    if    daily then return SettingAllowed("accept filter", "acceptDaily", db.acceptDaily) end
-    if   weekly then return SettingAllowed("accept filter", "acceptWeekly", db.acceptWeekly) end
-    if  trivial then return SettingAllowed("accept filter", "acceptTrivial", db.acceptTrivial) end
-    if warbound then return SettingAllowed("accept filter", "acceptWarboundCompleted", db.acceptWarboundCompleted) end
+    if     meta then return SettingAllowed("acceptMeta", db.acceptMeta) end
+    if    daily then return SettingAllowed("acceptDaily", db.acceptDaily) end
+    if   weekly then return SettingAllowed("acceptWeekly", db.acceptWeekly) end
+    if  trivial then return SettingAllowed("acceptTrivial", db.acceptTrivial) end
+    if warbound then
+        return SettingAllowed(
+            "acceptWarboundCompleted",
+            db.acceptWarboundCompleted
+        )
+    end
 
-    return SettingAllowed("accept filter", "acceptRegular", db.acceptRegular)
+    return SettingAllowed("acceptRegular", db.acceptRegular)
 end
 
 function Decisions:ShouldTurnIn(questOrID)
@@ -237,13 +260,12 @@ function Decisions:ShouldTurnIn(questOrID)
 
     local questID = SafeQuestID(quest.questID)
     if not questID then
-        return false, "quest ID is unsafe"
+        return false, "Cannot safely identify this quest."
     end
 
     local title = Safety:OptionalString(GetTitle(questID))
     if title and title:find("Delver's Call:", 1, true) then
         return SettingAllowed(
-            "turn-in filter",
             "questTurnInDelve",
             AutoQuestGossipDB and AutoQuestGossipDB.questTurnInDelve
         )
@@ -261,22 +283,25 @@ function Decisions:RequiredQuestItemBlocksTurnIn()
             Safety:OptionalString(name, "required item name")
 
         if nameReason then
-            return true, "?", nameReason
+            return true, "?", "Cannot safely read a required item."
         end
 
         if itemName and not Safety:IsSafeNumber(itemID) then
-            return true, itemName, "required item ID is unsafe"
+            return true, itemName,
+                "Cannot safely identify the required item."
         end
 
         if itemName then
             local isReagent = select(17, C_Item.GetItemInfo(itemID))
 
             if Safety:IsSecret(isReagent) then
-                return true, itemName, "required item reagent flag is secret"
+                return true, itemName,
+                    "Cannot safely check the required item type."
             end
 
             if isReagent then
-                return true, itemName, "quest requires crafting reagent"
+                return true, itemName,
+                    "This turn-in requires a crafting reagent."
             end
         end
     end
@@ -365,7 +390,8 @@ end
 
 local function CheckQuestModuleEnabled()
     if not AutoQuestGossipDB or not AutoQuestGossipDB.questEnabled then
-        return Block("quest automation disabled", "quest disabled")
+        return Block("Quest automation is disabled in AQG settings.",
+            "quest disabled")
     end
 
     return nil
@@ -373,7 +399,8 @@ end
 
 local function CheckAcceptEnabled()
     if not AutoQuestGossipDB.questAcceptEnabled then
-        return Block("quest accept disabled", "quest accept disabled")
+        return Block("Quest auto-accept is disabled in AQG settings.",
+            "quest accept disabled")
     end
 
     return nil
@@ -381,7 +408,8 @@ end
 
 local function CheckTurnInEnabled()
     if not AutoQuestGossipDB.questTurnInEnabled then
-        return Block("quest turn-in disabled", "quest turn-in disabled")
+        return Block("Quest auto-turn-in is disabled in AQG settings.",
+            "quest turn-in disabled")
     end
 
     return nil
@@ -389,7 +417,7 @@ end
 
 local function CheckModifier()
     if Safety:CheckModifierPaused("Quest") then
-        return Block("modifier key held", "modifier paused")
+        return Block("Your pause modifier key is held.", "modifier paused")
     end
 
     return nil
@@ -397,11 +425,13 @@ end
 
 local function CheckNPCContext(npcContext)
     if not npcContext or not npcContext.safe then
-        return Block("NPC identity unavailable or secret", "npc identity secret")
+        return Block("Cannot safely identify this NPC.",
+            "npc identity secret")
     end
 
     if npcContext.blocked then
-        return Block(npcContext.blockReason or "NPC is blocked", "blocked NPC")
+        return Block(npcContext.blockReason or
+            "This NPC is blocked by your blocklist.", "blocked NPC")
     end
 
     return nil
@@ -427,27 +457,28 @@ local function CheckGossipSharedBlockers(context)
     local gossip = context and context.gossip or {}
 
     if gossip.unsafeOptionCount and gossip.unsafeOptionCount > 0 then
-        return Block("gossip option data is unsafe", "unsafe gossip option")
+        return Block("Cannot safely read this gossip interaction.",
+            "unsafe gossip option")
     end
 
     if gossip.hasSkip then
         return WithWarning(
-            Block("skip option detected", "skip option"),
-            "Skip option detected - automation paused."
+            Block("A skip option is available.", "skip option"),
+            "A skip option is available. Choose manually."
         )
     end
 
     if gossip.hasImportant then
         return WithWarning(
-            Block("important option detected", "important option"),
-            "Important selections detected - automation paused."
+            Block("An important option is available.", "important option"),
+            "An important option is available. Choose manually."
         )
     end
 
     if gossip.hasAngleBracket and AutoQuestGossipDB.pauseOnAngleBracket then
         return WithWarning(
-            Block("angle bracket option detected", "angle bracket option"),
-            "Angle bracket option detected - automation paused."
+            Block("A bracketed option is available.", "angle bracket option"),
+            "A bracketed option is available. Choose manually."
         )
     end
 
@@ -459,7 +490,7 @@ local function ReadGoldCost()
     local goldCost, reason = Safety:RequireNumber(value, "quest gold cost")
 
     if reason then
-        return nil, reason
+        return nil, "Cannot safely read the quest gold cost."
     end
 
     return goldCost, nil
@@ -471,7 +502,7 @@ local function ReadQuestChoiceCount()
         Safety:RequireNumber(value, "quest reward choice count")
 
     if reason then
-        return nil, reason
+        return nil, "Cannot safely read the reward choice count."
     end
 
     return numChoices, nil
@@ -483,7 +514,7 @@ local function ReadQuestCompletable()
         Safety:OptionalBoolean(value, "quest completable", false)
 
     if reason then
-        return nil, reason
+        return nil, "Cannot safely check whether this quest is complete."
     end
 
     return completable, nil
@@ -494,7 +525,7 @@ local function ReadQuestPvP()
     local isPvP, reason = Safety:OptionalBoolean(value, "quest PvP flag", false)
 
     if reason then
-        return nil, reason
+        return nil, "Cannot safely check whether this quest flags you for PvP."
     end
 
     return isPvP, nil
@@ -506,7 +537,7 @@ local function ReadQuestAutoAccept()
         Safety:OptionalBoolean(value, "quest auto-accept flag", false)
 
     if reason then
-        return nil, reason
+        return nil, "Cannot safely check this quest's auto-accept state."
     end
 
     return autoAccept, nil
@@ -517,7 +548,7 @@ local function ReadRequiresCurrency()
     local count, reason = Safety:RequireNumber(value, "required currency count")
 
     if reason then
-        return nil, reason
+        return nil, "Cannot safely read the required currency count."
     end
 
     return count > 0, nil
@@ -530,36 +561,50 @@ local function BuildGreetingAvailableQuest(index)
         Safety:RequireNumber(questID, "available quest ID")
 
     if reason or safeQuestID == 0 then
-        return nil, reason or "available quest ID is invalid"
+        return nil, "Cannot safely identify an available quest."
     end
 
     local safeFrequency, frequencyReason =
         Safety:OptionalNumber(frequency, "available quest frequency")
-    if frequencyReason then return nil, frequencyReason end
+    if frequencyReason then
+        return nil, "Cannot safely read the available quest type."
+    end
 
     local safeQuestInfoID, questInfoReason =
         Safety:OptionalNumber(questInfoID, "available quest info ID")
-    if questInfoReason then return nil, questInfoReason end
+    if questInfoReason then
+        return nil, "Cannot safely read the available quest info."
+    end
 
     local safeIsTrivial, trivialReason =
         Safety:OptionalBoolean(isTrivial, "available quest trivial flag", false)
-    if trivialReason then return nil, trivialReason end
+    if trivialReason then
+        return nil, "Cannot safely read the available quest trivial flag."
+    end
 
     local safeRepeatable, repeatableReason =
         Safety:OptionalBoolean(repeatable, "available quest repeatable flag", false)
-    if repeatableReason then return nil, repeatableReason end
+    if repeatableReason then
+        return nil, "Cannot safely read the available quest repeatable flag."
+    end
 
     local safeLegendary, legendaryReason =
         Safety:OptionalBoolean(legendary, "available quest legendary flag", false)
-    if legendaryReason then return nil, legendaryReason end
+    if legendaryReason then
+        return nil, "Cannot safely read the available quest legendary flag."
+    end
 
     local safeImportant, importantReason =
         Safety:OptionalBoolean(important, "available quest important flag", false)
-    if importantReason then return nil, importantReason end
+    if importantReason then
+        return nil, "Cannot safely read the available quest important flag."
+    end
 
     local safeMeta, metaReason =
         Safety:OptionalBoolean(meta, "available quest meta flag", false)
-    if metaReason then return nil, metaReason end
+    if metaReason then
+        return nil, "Cannot safely read the available quest meta flag."
+    end
 
     return {
         questID = safeQuestID,
@@ -581,12 +626,14 @@ local function BuildGreetingActiveQuest(index)
         Safety:RequireNumber(questID, "active quest ID")
 
     if reason or safeQuestID == 0 then
-        return nil, reason or "active quest ID is invalid"
+        return nil, "Cannot safely identify an active quest."
     end
 
     local safeIsComplete, completeReason =
         Safety:OptionalBoolean(isComplete, "active quest complete flag", false)
-    if completeReason then return nil, completeReason end
+    if completeReason then
+        return nil, "Cannot safely check whether the active quest is complete."
+    end
 
     return {
         questID = safeQuestID,
@@ -712,7 +759,8 @@ function Decisions:DecideGossipQuestAction(context)
 
     local quests = context and context.quests or {}
     if quests.unsafeQuestCount and quests.unsafeQuestCount > 0 then
-        return Block("quest data contains unsafe fields", "unsafe quest data")
+        return Block("Cannot safely read quest data from this NPC.",
+            "unsafe quest data")
     end
 
     local skippedReason
@@ -722,7 +770,8 @@ function Decisions:DecideGossipQuestAction(context)
         for _, quest in ipairs(quests.active or {}) do
             if quest.isComplete then
                 if not quest.safe or not SafeQuestID(quest.questID) then
-                    return Block("complete quest ID is unsafe", "unsafe quest ID")
+                    return Block("Cannot safely identify a completed quest.",
+                        "unsafe quest ID")
                 end
 
                 local shouldTurnIn, turnInReason = self:ShouldTurnIn(quest)
@@ -744,7 +793,8 @@ function Decisions:DecideGossipQuestAction(context)
     if AutoQuestGossipDB.questAcceptEnabled then
         for _, quest in ipairs(quests.available or {}) do
             if not quest.safe or not SafeQuestID(quest.questID) then
-                return Block("available quest ID is unsafe", "unsafe quest ID")
+                return Block("Cannot safely identify an available quest.",
+                    "unsafe quest ID")
             end
 
             local shouldAccept, acceptReason = self:ShouldAccept(quest)
@@ -848,7 +898,8 @@ function Decisions:DecideQuestAcceptConfirmAction(playerName, questTitle, questI
     local safeQuestID, reason =
         Safety:RequireNumber(questID, "shared quest ID")
     if reason or safeQuestID == 0 then
-        return Block(reason or "shared quest ID is invalid", "unsafe quest ID")
+        return Block("Cannot safely identify the shared quest.",
+            "unsafe quest ID")
     end
 
     local quest = {
@@ -860,7 +911,8 @@ function Decisions:DecideQuestAcceptConfirmAction(playerName, questTitle, questI
     local shouldAccept, acceptReason = self:ShouldAccept(quest)
     if not shouldAccept then
         return AddQuestMetadata(
-            Block(acceptReason or "shared quest blocked by accept filters",
+            Block(acceptReason or
+                "This shared quest is blocked by your AQG settings.",
                 "accept filter"),
             quest
         )
@@ -886,7 +938,8 @@ function Decisions:DecideQuestDetailAction(questID)
     local safeQuestID, reason =
         Safety:RequireNumber(questID, "quest detail ID")
     if reason or safeQuestID == 0 then
-        return Block(reason or "quest detail ID is invalid", "unsafe quest ID")
+        return Block("Cannot safely identify this quest.",
+            "unsafe quest ID")
     end
 
     local isPvP, pvpReason = ReadQuestPvP()
@@ -894,7 +947,8 @@ function Decisions:DecideQuestDetailAction(questID)
         return Block(pvpReason, "unsafe PvP flag")
     end
     if isPvP then
-        return Block("PvP quest accept requires manual confirmation", "PvP quest")
+        return Block("This quest would flag you for PvP and must be accepted manually.",
+            "PvP quest")
     end
 
     local goldCost, goldReason = ReadGoldCost()
@@ -902,7 +956,7 @@ function Decisions:DecideQuestDetailAction(questID)
         return Block(goldReason, "unsafe gold cost")
     end
     if goldCost > 0 then
-        return Block("quest requires gold", "gold cost")
+        return Block("This quest requires gold.", "gold cost")
     end
 
     local quest = {
@@ -913,7 +967,8 @@ function Decisions:DecideQuestDetailAction(questID)
     local shouldAccept, acceptReason = self:ShouldAccept(quest)
     if not shouldAccept then
         return AddQuestMetadata(
-            Block(acceptReason or "quest blocked by accept filters",
+            Block(acceptReason or
+                "This quest is blocked by your AQG settings.",
                 "accept filter"),
             quest
         )
@@ -944,7 +999,8 @@ function Decisions:DecideQuestProgressAction(questID)
     local safeQuestID, reason =
         Safety:RequireNumber(questID, "quest progress ID")
     if reason or safeQuestID == 0 then
-        return Block(reason or "quest progress ID is invalid", "unsafe quest ID")
+        return Block("Cannot safely identify this quest.",
+            "unsafe quest ID")
     end
 
     local quest = {
@@ -955,7 +1011,8 @@ function Decisions:DecideQuestProgressAction(questID)
     local shouldTurnIn, turnInReason = self:ShouldTurnIn(quest)
     if not shouldTurnIn then
         return AddQuestMetadata(
-            Block(turnInReason or "quest blocked by turn-in filters",
+            Block(turnInReason or
+                "This quest turn-in is blocked by your AQG settings.",
                 "turn-in filter"),
             quest
         )
@@ -967,7 +1024,7 @@ function Decisions:DecideQuestProgressAction(questID)
     end
     if not completable then
         return AddQuestMetadata(
-            Block("quest is not completable", "not completable"),
+            Block("This quest is not ready to turn in.", "not completable"),
             quest
         )
     end
@@ -977,7 +1034,8 @@ function Decisions:DecideQuestProgressAction(questID)
         return Block(goldReason, "unsafe gold cost")
     end
     if goldCost > 0 then
-        return AddQuestMetadata(Block("quest requires gold", "gold cost"), quest)
+        return AddQuestMetadata(Block("This turn-in requires gold.",
+            "gold cost"), quest)
     end
 
     local requiresCurrency, currencyReason = ReadRequiresCurrency()
@@ -986,7 +1044,7 @@ function Decisions:DecideQuestProgressAction(questID)
     end
     if requiresCurrency then
         return AddQuestMetadata(
-            Block("quest requires currency", "required currency"),
+            Block("This turn-in requires currency.", "required currency"),
             quest
         )
     end
@@ -1023,7 +1081,8 @@ function Decisions:DecideQuestCompleteAction(questID)
     local safeQuestID, reason =
         Safety:RequireNumber(questID, "quest complete ID")
     if reason or safeQuestID == 0 then
-        return Block(reason or "quest complete ID is invalid", "unsafe quest ID")
+        return Block("Cannot safely identify this quest.",
+            "unsafe quest ID")
     end
 
     local quest = {
@@ -1034,7 +1093,8 @@ function Decisions:DecideQuestCompleteAction(questID)
     local shouldTurnIn, turnInReason = self:ShouldTurnIn(quest)
     if not shouldTurnIn then
         return AddQuestMetadata(
-            Block(turnInReason or "quest blocked by turn-in filters",
+            Block(turnInReason or
+                "This quest turn-in is blocked by your AQG settings.",
                 "turn-in filter"),
             quest
         )
@@ -1050,12 +1110,14 @@ function Decisions:DecideQuestCompleteAction(questID)
         return Block(goldReason, "unsafe gold cost")
     end
     if goldCost > 0 then
-        return AddQuestMetadata(Block("quest requires gold", "gold cost"), quest)
+        return AddQuestMetadata(Block("This turn-in requires gold.",
+            "gold cost"), quest)
     end
 
     if numChoices > 1 then
         local decision = AddQuestMetadata(
-            Block("quest has multiple reward choices", "multiple rewards"),
+            Block("This quest has multiple reward choices.",
+                "multiple rewards"),
             quest
         )
         decision.numChoices = numChoices
@@ -1087,7 +1149,8 @@ function Decisions:DecideQuestAutocompleteAction(questID)
     local safeQuestID, reason =
         Safety:RequireNumber(questID, "autocomplete quest ID")
     if reason or safeQuestID == 0 then
-        return Block(reason or "autocomplete quest ID is invalid", "unsafe quest ID")
+        return Block("Cannot safely identify this quest.",
+            "unsafe quest ID")
     end
 
     local quest = {
@@ -1097,7 +1160,8 @@ function Decisions:DecideQuestAutocompleteAction(questID)
     local shouldTurnIn, turnInReason = self:ShouldTurnIn(quest)
     if not shouldTurnIn then
         return AddQuestMetadata(
-            Block(turnInReason or "quest blocked by turn-in filters",
+            Block(turnInReason or
+                "This quest turn-in is blocked by your AQG settings.",
                 "turn-in filter"),
             quest
         )
@@ -1106,18 +1170,21 @@ function Decisions:DecideQuestAutocompleteAction(questID)
     local index = GetLogIndexForQuestID(safeQuestID)
     local safeIndex, indexReason = Safety:RequireNumber(index, "quest log index")
     if indexReason then
-        return Block(indexReason, "missing quest log entry")
+        return Block("Cannot find this quest in your quest log.",
+            "missing quest log entry")
     end
 
     local info = GetInfo(safeIndex)
     if type(info) ~= "table" then
-        return Block("quest log info is unavailable", "missing quest info")
+        return Block("Cannot read this quest from your quest log.",
+            "missing quest info")
     end
 
     local isAutoComplete, autoCompleteReason =
         Safety:OptionalBoolean(info.isAutoComplete, "autocomplete flag", false)
     if autoCompleteReason then
-        return Block(autoCompleteReason, "unsafe autocomplete flag")
+        return Block("Cannot safely check whether this quest can auto-complete.",
+            "unsafe autocomplete flag")
     end
     if not isAutoComplete then
         return NoAction("quest is not auto-complete")

@@ -115,11 +115,11 @@ local function RevalidateDecision(decision)
 
     if not currentDecision or not currentDecision.allowed then
         return nil, currentDecision and currentDecision.reason
-            or "gossip decision is no longer allowed"
+            or "Could not confirm the gossip action before acting."
     end
 
     if not SameDecision(decision, currentDecision) then
-        return nil, "gossip option changed"
+        return nil, "The gossip option changed before acting."
     end
 
     return currentDecision, nil
@@ -150,13 +150,14 @@ local function ExecuteGossipDecision(decision)
 
     local loopKey = LoopKey(currentDecision)
     if not loopKey then
-        DebugRevalidationFailed("gossip loop key is unavailable")
+        DebugRevalidationFailed("Cannot safely track this gossip selection.")
         return false
     end
 
     if selectedGossipKeys[loopKey] then
-        Safety:DebugRevalidationFailed("gossip loop detected")
-        AQG:Warn("Gossip loop detected - automation paused.")
+        local reason = "A repeated gossip selection was detected."
+        Safety:DebugRevalidationFailed(reason)
+        AQG:Warn(reason)
 
         return false
     end
