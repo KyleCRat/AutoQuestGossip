@@ -380,7 +380,7 @@ end
 --------------------------------------------------------------------------------
 
 local function ValidateCurrentQuest(decision)
-    local ok, reason = Safety:ValidateCurrentQuest(decision.targetID, "QuestFrame")
+    local ok, reason = Safety:ValidateCurrentQuest(decision.targetID)
     if not ok then
         return false, reason
     end

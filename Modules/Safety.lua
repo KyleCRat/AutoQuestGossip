@@ -554,7 +554,7 @@ end
 -- Final Pre-Action Revalidation
 --------------------------------------------------------------------------------
 
-function Safety:ValidateCurrentQuest(questID, frameName)
+function Safety:ValidateCurrentQuest(questID)
     if not self:IsSafeNumber(questID) or questID == 0 then
         return false, "Cannot safely identify this quest."
     end
@@ -564,25 +564,16 @@ function Safety:ValidateCurrentQuest(questID, frameName)
         return false, "Cannot safely identify the current quest."
     end
 
-    if currentQuestID ~= nil then
-        if type(currentQuestID) ~= "number" then
-            return false, "Cannot safely identify the current quest."
-        end
-
-        if currentQuestID == 0 then
-            return false, "The current quest is no longer available."
-        end
-
-        if currentQuestID ~= questID then
-            return false, "The current quest changed before acting."
-        end
+    if type(currentQuestID) ~= "number" then
+        return false, "Cannot safely identify the current quest."
     end
 
-    if frameName then
-        local frame = _G[frameName]
-        if frame and frame.IsShown and not frame:IsShown() then
-            return false, "The quest frame closed before acting."
-        end
+    if currentQuestID == 0 then
+        return false, "The current quest is no longer available."
+    end
+
+    if currentQuestID ~= questID then
+        return false, "The current quest changed before acting."
     end
 
     return true
