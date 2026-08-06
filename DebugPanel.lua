@@ -38,7 +38,7 @@ pauseFrame:Hide()
 
 local pauseText = pauseFrame:CreateFontString(nil, "OVERLAY")
 pauseText:SetDrawLayer("OVERLAY", 7)
-pauseText:SetFont(FONT_PATH, PAUSE_FONT_SIZE, "THICKOUTLINE")
+pauseText:SetFont(FONT_PATH, PAUSE_FONT_SIZE, "OUTLINE, SLUG")
 pauseText:SetTextColor(unpack(PAUSE_COLOR))
 pauseText:SetShadowColor(0, 0, 0, 1)
 pauseText:SetShadowOffset(2, -2)
@@ -164,7 +164,7 @@ local function AnchorPauseFrame(anchorFrame)
     end
 
     -- Re-apply after re-parenting; nested FontStrings can lose font settings.
-    pauseText:SetFont(FONT_PATH, PAUSE_FONT_SIZE, "THICKOUTLINE")
+    pauseText:SetFont(FONT_PATH, PAUSE_FONT_SIZE, "OUTLINE, SLUG")
     pauseText:SetTextColor(unpack(PAUSE_COLOR))
 
     return true
