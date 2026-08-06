@@ -69,7 +69,7 @@ AQG:OnInit(function()
     AddCheckbox("gossipEnabled", "Enable Gossip Automation", "Automatically select gossip options when talking to NPCs")
     AddCheckbox("automateDelveGossip", "Automate Delve Gossip",
         "Automatically select a single safe gossip option marked (Delve), even when " ..
-        "the NPC's identity is hidden or secret. Other gossip safety checks still apply.")
+        "the NPC's identity is secret. Other gossip safety checks still apply.")
     AddCheckbox("gossipOnlySingle", "Only Auto-Select Single Option",
         "When enabled, gossip will only be auto-selected if there is exactly one option. " ..
         "If there are multiple options, you choose manually.")

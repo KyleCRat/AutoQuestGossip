@@ -424,9 +424,16 @@ local function CheckModifier()
 end
 
 local function CheckNPCContext(npcContext)
-    if not npcContext or not npcContext.safe then
-        return Block("Cannot safely identify this NPC.",
-            "npc identity secret")
+    if not npcContext then
+        return Block("NPC interaction context is unavailable.",
+            "missing NPC context")
+    end
+
+    if not npcContext.safe then
+        local blocker = npcContext.identitySecret and
+            "npc identity secret" or "npc identity unavailable"
+        return Block(npcContext.blockReason or
+            "This NPC's identity is unavailable.", blocker)
     end
 
     if npcContext.blocked then

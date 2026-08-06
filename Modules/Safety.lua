@@ -483,14 +483,25 @@ function Safety:BuildNPCContext(unit)
     unit = unit or "npc"
 
     local guid = UnitGUID(unit)
-    if self:IsSecret(guid) or not guid or type(guid) ~= "string" then
+    local identitySecret = self:IsSecret(guid)
+    if identitySecret or not guid or type(guid) ~= "string" then
+        local identityReason
+        if identitySecret then
+            identityReason = "This NPC's identity is secret."
+        elseif not guid then
+            identityReason = "This NPC's identity is unavailable."
+        else
+            identityReason = "This NPC's identity could not be read."
+        end
+
         return {
             safe = false,
             guid = nil,
             id = nil,
             name = UNKNOWN_VALUE,
+            identitySecret = identitySecret,
             blocked = false,
-            blockReason = "Cannot safely identify this NPC.",
+            blockReason = identityReason,
         }
     end
 
@@ -502,6 +513,7 @@ function Safety:BuildNPCContext(unit)
         guid = guid,
         id = npcID,
         name = name,
+        identitySecret = false,
         blocked = false,
         blockReason = nil,
     }

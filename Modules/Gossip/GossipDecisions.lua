@@ -183,15 +183,17 @@ local function CheckCommonBlockers(context, allowRestrictedNPC)
 
     local npc = context and context.npc
     if not npc then
-        return Block("Cannot safely identify this NPC.",
-            "npc identity secret")
+        return Block("NPC interaction context is unavailable.",
+            "missing NPC context")
     end
 
     -- A prevalidated delve decision may bypass restricted identity, but known
     -- NPCs still honor the configured blocklists.
-    if not npc.safe and not allowRestrictedNPC then
-        return Block("Cannot safely identify this NPC.",
-            "npc identity secret")
+    if not npc.safe and not (allowRestrictedNPC and npc.identitySecret) then
+        local blocker = npc.identitySecret and
+            "npc identity secret" or "npc identity unavailable"
+        return Block(npc.blockReason or
+            "This NPC's identity is unavailable.", blocker)
     end
 
     if npc.safe and npc.blocked then
