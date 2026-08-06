@@ -38,6 +38,7 @@ local defaults = {
 
     -- Gossip settings
     gossipEnabled = true,
+    automateDelveGossip = false,
     gossipOnlySingle = true,
     allowSafeFallbackGossip = true,
     pauseOnAngleBracket = true,

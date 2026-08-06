@@ -11,6 +11,7 @@ local MAX_FALLBACK_OPTIONS = 3
 
 local ACTIONS = {
     SELECT_QUEST = "GOSSIP_SELECT_QUEST",
+    SELECT_DELVE = "GOSSIP_SELECT_DELVE",
     SELECT_BLIZZARD_AUTO = "GOSSIP_SELECT_BLIZZARD_AUTO",
     SELECT_VENDOR = "GOSSIP_SELECT_VENDOR",
     SELECT_FALLBACK = "GOSSIP_SELECT_FALLBACK",
@@ -172,7 +173,7 @@ local function FindImportantOptionRequiringPause(options)
     return nil
 end
 
-local function CheckCommonBlockers(context)
+local function CheckCommonBlockers(context, allowRestrictedNPC)
     local db = AutoQuestGossipDB
 
     if not db or not db.gossipEnabled then
@@ -181,12 +182,19 @@ local function CheckCommonBlockers(context)
     end
 
     local npc = context and context.npc
-    if not npc or not npc.safe then
+    if not npc then
         return Block("Cannot safely identify this NPC.",
             "npc identity secret")
     end
 
-    if npc.blocked then
+    -- A prevalidated delve decision may bypass restricted identity, but known
+    -- NPCs still honor the configured blocklists.
+    if not npc.safe and not allowRestrictedNPC then
+        return Block("Cannot safely identify this NPC.",
+            "npc identity secret")
+    end
+
+    if npc.safe and npc.blocked then
         return Block(npc.blockReason or
             "This NPC is blocked by your blocklist.", "blocked NPC")
     end
@@ -265,6 +273,48 @@ local function FindQuestOptions(options)
     end
 
     return questOptions
+end
+
+local function FindDelveOptions(options)
+    local delveOptions = {}
+
+    for _, option in ipairs(options or {}) do
+        if option.isDelve then
+            table.insert(delveOptions, option)
+        end
+    end
+
+    return delveOptions
+end
+
+local function DecideAutomatedDelveAction(context)
+    if not AutoQuestGossipDB.automateDelveGossip then
+        return nil
+    end
+
+    local gossip = context and context.gossip or {}
+    local delveOptions = FindDelveOptions(gossip.options)
+
+    if #delveOptions == 0 then
+        return nil
+    end
+
+    if #delveOptions > 1 then
+        return Block("Multiple Delve gossip options are available. Choose manually.",
+            "multiple delve options")
+    end
+
+    local option = delveOptions[1]
+    if not IsSelectableByID(option) then
+        return Block("Cannot safely select the Delve gossip option.",
+            "blocked delve option")
+    end
+
+    return Allow(
+        ACTIONS.SELECT_DELVE,
+        option,
+        "Delve gossip automation is enabled for this option"
+    )
 end
 
 local function FindVendorOption(options)
@@ -355,8 +405,14 @@ function Decisions:FindBestGossipOption(context)
 end
 
 function Decisions:DecideGossipAction(context)
-    local block = CheckCommonBlockers(context)
+    local delveDecision = DecideAutomatedDelveAction(context)
+    local allowRestrictedNPC = delveDecision and delveDecision.allowed
+    local block = CheckCommonBlockers(context, allowRestrictedNPC)
     if block then return block end
+
+    if delveDecision then
+        return delveDecision
+    end
 
     local gossip = context and context.gossip or {}
     local options = gossip.options or {}
