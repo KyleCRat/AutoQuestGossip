@@ -104,6 +104,7 @@ local function MakeGossipQuestResult(decision, executed, pending)
         executed = executed and true or false,
         pending = pending and true or false,
         selected = decision and decision.allowed or false,
+        preventGossip = decision and decision.preventGossip or false,
     }
 end
 

@@ -10,7 +10,8 @@ local Safety = AQG.Safety
 local RunGossipShow
 
 local function QuestStopsGossip(result)
-    return result and (result.pending or result.selected or result.executed)
+    return result and (result.pending or result.selected or result.executed or
+        result.preventGossip)
 end
 
 local function SameInteraction(expectedContext)

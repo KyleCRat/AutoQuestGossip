@@ -765,6 +765,8 @@ function Decisions:DecideGossipQuestAction(context)
 
     local skippedReason
     local skippedQuest
+    local blockedTurnInReason
+    local blockedTurnInQuest
 
     if AutoQuestGossipDB.questTurnInEnabled then
         for _, quest in ipairs(quests.active or {}) do
@@ -782,12 +784,18 @@ function Decisions:DecideGossipQuestAction(context)
                         "completed gossip quest"
                     )
                     return AddQuestMetadata(decision, quest)
-                elseif turnInReason and not skippedReason then
-                    skippedReason = turnInReason
-                    skippedQuest = quest
+                elseif turnInReason and not blockedTurnInReason then
+                    blockedTurnInReason = turnInReason
+                    blockedTurnInQuest = quest
                 end
             end
         end
+    end
+
+    if blockedTurnInReason then
+        local decision = Block(blockedTurnInReason, "turn-in filter")
+        decision.preventGossip = true
+        return AddQuestMetadata(decision, blockedTurnInQuest)
     end
 
     if AutoQuestGossipDB.questAcceptEnabled then
