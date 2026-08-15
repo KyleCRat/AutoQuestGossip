@@ -18,6 +18,9 @@ AQG:OnInit(function()
 
     AddHeader("Auto Accept")
     AddCheckbox("questAcceptEnabled", "Enable Auto Accept", "Automatically accept quests when offered")
+    AddCheckbox("acceptAutoPush", "Auto-Pushed Quests",
+        "Allow AQG to accept quests automatically offered by the game, such as quests " ..
+        "pushed when entering an area. When disabled, AQG leaves the offer for manual acceptance.")
     AddCheckbox("acceptDaily", "Daily Quests", "Auto-accept daily quests")
     AddCheckbox("acceptWeekly", "Weekly Quests", "Auto-accept weekly quests")
     AddCheckbox("acceptTrivial", "Trivial (Low Level) Quests", "Auto-accept quests that are grey/trivial for your level")

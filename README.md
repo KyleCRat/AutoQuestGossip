@@ -9,9 +9,10 @@ Automates quest accept/turn-in and gossip selection in World of Warcraft.
 - **Quest Automation** - automatically accept and turn in quests from gossip windows, quest frames, and the objective tracker
 - **Gossip Automation** - automatically select gossip options with smart filtering (quest > auto-select > vendor > safe fallback)
 - **Quest Classification** - filter automation by quest type: daily, weekly, trivial, warbound completed, meta, and regular
+- **Auto-Push Control** - automatically accept area-triggered quest offers, with a setting to require manual acceptance instead
 - **Content Filters** - toggle automation for dungeon, raid, PvP, group, delve, and world boss quests
 - **Safety Guards** - pauses on skip options, important (colored) options, angle bracket choices, cinematics, and Stay Awhile and Listen prompts
-- **NPC Blocklists** - block automation for specific NPCs by ID or name
+- **NPC and Quest Blocklists** - block automation for specific NPCs or prevent acceptance of specific quests
 - **Modifier Key** - hold Shift, Ctrl, or Alt to temporarily pause all automation
 - **Delve Turn-in Control** - separate setting for Delver's Call quest turn-ins
 - **Debug Panel** - scrollable, copyable debug output anchored to quest/gossip frames or floating via `/aqg debug`

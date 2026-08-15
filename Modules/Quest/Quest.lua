@@ -426,7 +426,10 @@ local function ExecuteQuestDetailDecision(decision)
     end
 
     decision = RevalidateForAction(decision, function()
-        return Decisions:DecideQuestDetailAction(decision.targetID)
+        return Decisions:DecideQuestDetailAction(
+            decision.targetID,
+            decision.detailContext
+        )
     end)
     if not decision then
         return false
@@ -458,6 +461,13 @@ local function ExecuteQuestDetailDecision(decision)
         return false
     end
 
+    local allowAutoPush, autoPushReason =
+        Decisions:ShouldAcceptAutoPush(decision.autoPush)
+    if not allowAutoPush then
+        DebugRevalidationFailed(autoPushReason)
+        return false
+    end
+
     local shouldAccept, acceptReason =
         Decisions:ShouldAccept(decision.quest or decision.targetID)
     if not shouldAccept then
@@ -466,9 +476,15 @@ local function ExecuteQuestDetailDecision(decision)
         return false
     end
 
+
     local autoAccept, autoReason = ReadCurrentAutoAcceptFlag()
     if autoReason then
         DebugRevalidationFailed(autoReason)
+        return false
+    end
+
+    if autoAccept ~= decision.autoAccept then
+        DebugRevalidationFailed("The quest's auto-accept state changed before acting.")
         return false
     end
 
@@ -718,15 +734,21 @@ end
 
 AQG:RegisterEvent("QUEST_ACCEPT_CONFIRM", OnQuestAcceptConfirm)
 
-local function OnQuestDetail(questID)
+local function OnQuestDetail(questID, detailContext)
     questID = questID or GetQuestID()
+    detailContext = detailContext or Decisions:BuildQuestDetailContext()
 
-    if Decisions:IsSafeQuestID(questID) and
-       not Decisions:IsQuestDataReady(questID, OnQuestDetail) then
-        return
+    if Decisions:IsSafeQuestID(questID) then
+        local function RetryQuestDetail(retryQuestID)
+            OnQuestDetail(retryQuestID, detailContext)
+        end
+
+        if not Decisions:IsQuestDataReady(questID, RetryQuestDetail) then
+            return
+        end
     end
 
-    local decision = Decisions:DecideQuestDetailAction(questID)
+    local decision = Decisions:DecideQuestDetailAction(questID, detailContext)
     DebugDecision("QUEST_DETAIL", decision)
     ExecuteQuestDetailDecision(decision)
 end

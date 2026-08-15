@@ -10,6 +10,7 @@ local defaults = {
 
     -- Quest Accept Settings
     questAcceptEnabled = true,
+    acceptAutoPush = true,
     acceptDaily = true,
     acceptWeekly = true,
     acceptTrivial = false,

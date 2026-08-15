@@ -58,6 +58,7 @@ local SETTING_BLOCK_REASONS = {
     contentGroup = "Group quests are blocked by your AQG settings.",
     contentDelve = "Delve quests are blocked by your AQG settings.",
     contentWorldBoss = "World boss quests are blocked by your AQG settings.",
+    acceptAutoPush = "Auto-pushed quests are blocked by your AQG settings.",
     acceptDaily = "Daily quests are blocked by your AQG settings.",
     acceptWeekly = "Weekly quests are blocked by your AQG settings.",
     acceptTrivial = "Trivial quests are blocked by your AQG settings.",
@@ -230,11 +231,20 @@ function Decisions:ShouldAccept(questOrID)
     local quest = type(questOrID) == "table"
         and questOrID or { questID = questOrID }
 
-    if not SafeQuestID(quest.questID) then
+    local questID = SafeQuestID(quest.questID)
+    if not questID then
         return false, "Cannot safely identify this quest."
     end
 
-    local allowed, reason = self:ShouldAllowContent(quest.questID)
+    if AQG.BlockedQuestIDs[questID] then
+        local title = Safety:OptionalString(quest.title)
+            or Safety:OptionalString(GetTitle(questID))
+        local subject = title and ("Quest '" .. title .. "'") or "This quest"
+
+        return false, subject .. " is blocked by your AQG quest blocklist."
+    end
+
+    local allowed, reason = self:ShouldAllowContent(questID)
     if not allowed then return false, reason end
 
     local db = AutoQuestGossipDB
@@ -252,6 +262,17 @@ function Decisions:ShouldAccept(questOrID)
     end
 
     return SettingAllowed("acceptRegular", db.acceptRegular)
+end
+
+function Decisions:ShouldAcceptAutoPush(autoPush)
+    if not autoPush then
+        return true, nil
+    end
+
+    return SettingAllowed(
+        "acceptAutoPush",
+        AutoQuestGossipDB and AutoQuestGossipDB.acceptAutoPush
+    )
 end
 
 function Decisions:ShouldTurnIn(questOrID)
@@ -548,6 +569,35 @@ local function ReadQuestAutoAccept()
     end
 
     return autoAccept, nil
+end
+
+local function ReadQuestFromAreaTrigger()
+    local value = QuestIsFromAreaTrigger and QuestIsFromAreaTrigger()
+    local fromAreaTrigger, reason =
+        Safety:OptionalBoolean(value, "quest area-trigger flag", false)
+
+    if reason then
+        return nil, "Cannot safely check how this quest was offered."
+    end
+
+    return fromAreaTrigger, nil
+end
+
+function Decisions:BuildQuestDetailContext()
+    local autoAccept, autoReason = ReadQuestAutoAccept()
+    if autoReason then
+        return { reason = autoReason }
+    end
+
+    local fromAreaTrigger, areaTriggerReason = ReadQuestFromAreaTrigger()
+    if areaTriggerReason then
+        return { reason = areaTriggerReason }
+    end
+
+    return {
+        autoAccept = autoAccept,
+        autoPush = autoAccept and fromAreaTrigger,
+    }
 end
 
 local function ReadRequiresCurrency()
@@ -943,8 +993,8 @@ function Decisions:DecideQuestAcceptConfirmAction(playerName, questTitle, questI
     return AddQuestMetadata(decision, quest)
 end
 
-function Decisions:DecideQuestDetailAction(questID)
-    local block = CheckCommonQuestState(true)
+function Decisions:DecideQuestDetailAction(questID, detailContext)
+    local block = CheckCommonQuestState(false)
     if block then return block end
 
     block = CheckAcceptEnabled()
@@ -957,6 +1007,11 @@ function Decisions:DecideQuestDetailAction(questID)
             "unsafe quest ID")
     end
 
+    detailContext = detailContext or self:BuildQuestDetailContext()
+    if detailContext.reason then
+        return Block(detailContext.reason, "unsafe quest offer source")
+    end
+
     local isPvP, pvpReason = ReadQuestPvP()
     if pvpReason then
         return Block(pvpReason, "unsafe PvP flag")
@@ -966,6 +1021,24 @@ function Decisions:DecideQuestDetailAction(questID)
             "PvP quest")
     end
 
+    local quest = {
+        questID = safeQuestID,
+        title = self:QuestTitle(safeQuestID),
+    }
+
+    local allowAutoPush, autoPushReason =
+        self:ShouldAcceptAutoPush(detailContext.autoPush)
+    if not allowAutoPush then
+        return AddQuestMetadata(
+            Block(autoPushReason, "auto-pushed quest"),
+            quest
+        )
+    end
+    if not detailContext.autoPush then
+        block = CheckCurrentNPC()
+        if block then return block end
+    end
+
     local goldCost, goldReason = ReadGoldCost()
     if goldReason then
         return Block(goldReason, "unsafe gold cost")
@@ -973,11 +1046,6 @@ function Decisions:DecideQuestDetailAction(questID)
     if goldCost > 0 then
         return Block("This quest requires gold.", "gold cost")
     end
-
-    local quest = {
-        questID = safeQuestID,
-        title = self:QuestTitle(safeQuestID),
-    }
 
     local shouldAccept, acceptReason = self:ShouldAccept(quest)
     if not shouldAccept then
@@ -989,17 +1057,16 @@ function Decisions:DecideQuestDetailAction(questID)
         )
     end
 
-    local autoAccept, autoReason = ReadQuestAutoAccept()
-    if autoReason then
-        return Block(autoReason, "unsafe auto-accept flag")
-    end
-
-    local action = autoAccept
+    local action = detailContext.autoAccept
         and ACTIONS.QUEST_DETAIL_ACK_AUTO_ACCEPT
         or ACTIONS.QUEST_DETAIL_ACCEPT
-    local decision = Allow(action, safeQuestID, "allowed quest detail")
+    local allowReason = detailContext.autoPush
+        and "allowed auto-pushed quest" or "allowed quest detail"
+    local decision = Allow(action, safeQuestID, allowReason)
     decision.goldCost = goldCost
-    decision.autoAccept = autoAccept
+    decision.autoAccept = detailContext.autoAccept
+    decision.autoPush = detailContext.autoPush
+    decision.detailContext = detailContext
 
     return AddQuestMetadata(decision, quest)
 end
