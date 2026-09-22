@@ -12,8 +12,8 @@ local IsRepeatableQuest = C_QuestLog.IsRepeatableQuest
 local GetQuestTagInfo = C_QuestLog.GetQuestTagInfo
 local IsQuestTrivial = C_QuestLog.IsQuestTrivial
 
-local RETRY_TIME_DELAY = 0.25
-local MAX_QUEST_DATA_RETRIES = 10
+local INITIAL_QUEST_DATA_RETRY_DELAY = 0.25
+local MAX_QUEST_DATA_RETRIES = 5
 local questDataRetryCounts = {}
 local pendingQuestDataRetries = {}
 
@@ -91,12 +91,15 @@ local function ScheduleQuestDataRetry(key, callback)
         return false
     end
 
+    local retryDelay = INITIAL_QUEST_DATA_RETRY_DELAY * 2 ^ (retryCount - 1)
+
     questDataRetryCounts[key] = retryCount
     pendingQuestDataRetries[key] = true
     AQG:Debug("|cffff4444[!] Quest data not cached, retrying "
-        .. retryCount .. "/" .. MAX_QUEST_DATA_RETRIES .. "...|r")
+        .. retryCount .. "/" .. MAX_QUEST_DATA_RETRIES
+        .. " in " .. retryDelay .. "s...|r")
 
-    C_Timer.After(RETRY_TIME_DELAY, function()
+    C_Timer.After(retryDelay, function()
         pendingQuestDataRetries[key] = nil
         callback()
     end)

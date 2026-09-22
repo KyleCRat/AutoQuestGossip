@@ -1,5 +1,8 @@
 # Changelog
 
+## [Unreleased]
+- Retry missing quest data up to five times with increasing delays, allowing more time for slow loads; debug messages show the next retry delay.
+
 ## [12.0.7-2] - 2026-06-08
 - Bump to game version 12.0.7
 
