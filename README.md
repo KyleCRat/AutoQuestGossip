@@ -2,7 +2,7 @@
 
 Automates quest accept/turn-in and gossip selection in World of Warcraft.
 
-**Version:** 12.0.5-1
+**Version:** 12.1.5-3
 
 ## Features
 
